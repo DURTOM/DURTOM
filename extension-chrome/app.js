@@ -161,7 +161,7 @@ function mostrarFaltantes() {
   $('faltResumen').textContent = `${faltantes.length} productos de Bidcom no están en tu tienda (sin ${prefijos().join(', ') || 'filtro'}).`;
   $('faltTabla').innerHTML = '<tr><th>SKU</th><th>Nombre</th><th>URL</th></tr>' +
     faltantes.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 70)}</td>` +
-      `<td>${p.url ? `<a href="${esc(p.url)}" target="_blank">Ver en Bidcom</a>` : ''}</td></tr>`).join('');
+      `<td>${p.url ? `<a href="${esc(p.url)}" target="_blank">${esc(p.url)}</a>` : ''}</td></tr>`).join('');
 }
 
 // ---------- WooCommerce ----------

@@ -68,6 +68,7 @@ class TestExtension(unittest.TestCase):
             page.wait_for_selector("text=Tienda actualizada", timeout=20_000)
             # lista de faltantes: sigue visible después de aplicar, sin REF/USA
             self.assertTrue(page.is_visible("#secFaltantes"))
+            self.assertIn("/drones/dron-dji-mini-5-pro-combo", page.inner_text("#faltTabla"))  # link visible
             with page.expect_download() as dl2:
                 page.click("#btnFaltantes")
             falt = Path(dl2.value.path()).read_text(encoding="utf-8-sig").splitlines()
