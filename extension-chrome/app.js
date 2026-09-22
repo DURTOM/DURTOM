@@ -2,7 +2,14 @@
 // productos, genera el CSV y (opcional) actualiza WooCommerce por API.
 const $ = (id) => document.getElementById(id);
 const ESPERA_MS = 1500;
-let productos = [];      // [{sku, name, normal, sale, url, categoria}]
+let productos = [];      // todo lo extraído: [{sku, name, normal, sale, url, categoria}]
+let fechaExtraccion = '';
+
+// Prefijos de SKU a descartar (ej. "REF, USA"). Se aplica siempre al mostrar,
+// descargar y actualizar, así un cambio en el casillero vale al instante.
+const prefijos = () => $('excluir').value.split(/[,;\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+const excluido = (p) => prefijos().some((x) => p.sku.toUpperCase().startsWith(x));
+const validos = () => productos.filter((p) => !excluido(p));
 let cambiosWoo = null;   // {simples: [...], variaciones: {pid: [...]}, filas: [...]}
 
 // ---------- utilidades ----------
@@ -37,7 +44,7 @@ async function cargar() {
   $('wooCs').value = d.wooCs ?? '';
   $('wooBorrar').checked = d.wooBorrar ?? true;
   if (d.wooUrl) $('detWoo').open = true;
-  if (d.ultimos && d.ultimos.length) { productos = d.ultimos; mostrarResultados(d.ultimosFecha); }
+  if (d.ultimos && d.ultimos.length) { productos = d.ultimos; fechaExtraccion = d.ultimosFecha; mostrarResultados(); }
 }
 
 // ---------- extracción ----------
@@ -102,31 +109,32 @@ async function extraerTodo() {
     if (miPestana) await chrome.tabs.update(miPestana.id, { active: true });
     $('btnExtraer').disabled = false;
   }
-  const prefijos = $('excluir').value.split(/[,;\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
-  const excluidos = Object.values(todos).filter((p) => prefijos.some((x) => p.sku.toUpperCase().startsWith(x)));
-  productos = Object.values(todos).filter((p) => !excluidos.includes(p));
-  if (excluidos.length) estado(`   Se descartaron ${excluidos.length} productos por SKU (${prefijos.join(', ')}).`);
-  const sinPrecio = productos.filter((p) => p.normal == null);
-  estado(`✔ Listo: ${productos.length} productos.` + (sinPrecio.length ? ` (${sinPrecio.length} sin precio)` : ''), 'ok');
-  const fecha = new Date().toLocaleString('es-AR');
-  chrome.storage.local.set({ ultimos: productos, ultimosFecha: fecha });
-  cambiosWoo = null; $('btnAplicar').disabled = true; $('wooTablaBox').hidden = true; $('wooResumen').textContent = '';
-  mostrarResultados(fecha);
+  productos = Object.values(todos);
+  const ok = validos();
+  const sinPrecio = ok.filter((p) => p.normal == null);
+  estado(`✔ Listo: ${ok.length} productos.` + (sinPrecio.length ? ` (${sinPrecio.length} sin precio)` : ''), 'ok');
+  fechaExtraccion = new Date().toLocaleString('es-AR');
+  chrome.storage.local.set({ ultimos: productos, ultimosFecha: fechaExtraccion });
+  mostrarResultados();
 }
 
-function mostrarResultados(fecha) {
+function mostrarResultados() {
+  const ok = validos();
+  const descartados = productos.length - ok.length;
+  cambiosWoo = null; $('btnAplicar').disabled = true; $('wooTablaBox').hidden = true; $('wooResumen').textContent = '';
   $('secResultados').hidden = !productos.length;
-  const conRebaja = productos.filter((p) => p.sale).length;
-  $('resumen').textContent = `${productos.length} productos (${conRebaja} con precio rebajado) — ${fecha || ''}`;
+  const conRebaja = ok.filter((p) => p.sale).length;
+  $('resumen').textContent = `${ok.length} productos (${conRebaja} con precio rebajado)` +
+    (descartados ? ` · ${descartados} descartados por SKU (${prefijos().join(', ')})` : '') + ` — ${fechaExtraccion || ''}`;
   $('tabla').innerHTML = '<tr><th>SKU</th><th>Producto</th><th>Precio normal</th><th>Precio rebajado</th></tr>' +
-    productos.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 60)}</td>` +
+    ok.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 60)}</td>` +
       `<td class="num">${pesos(p.normal)}</td><td class="num">${pesos(p.sale)}</td></tr>`).join('');
 }
 
 function descargarCsv() {
   const q = (s) => /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   const filas = [['SKU', 'Precio normal', 'Precio rebajado'],
-    ...productos.filter((p) => p.normal != null).map((p) => [p.sku, fmt(p.normal), fmt(p.sale)])];
+    ...validos().filter((p) => p.normal != null).map((p) => [p.sku, fmt(p.normal), fmt(p.sale)])];
   const csv = '﻿' + filas.map((f) => f.map(q).join(',')).join('\r\n') + '\r\n';
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -189,7 +197,7 @@ function pedirPermiso() {
 
 async function verCambios() {
   guardar();
-  if (!productos.length) { alert('Primero extraé los precios (paso 1).'); return; }
+  if (!validos().length) { alert('Primero extraé los precios (paso 1).'); return; }
   const cfg = await pedirPermiso();
   if (!cfg) return;
   $('btnVer').disabled = true; $('btnAplicar').disabled = true;
@@ -198,7 +206,8 @@ async function verCambios() {
     const borrar = $('wooBorrar').checked;
     const simples = [], variaciones = {}, filas = [];
     let coinciden = 0;
-    for (const p of productos) {
+    const lista = validos();
+    for (const p of lista) {
       const cur = mapa[p.sku.toUpperCase()];
       if (!cur || p.normal == null) continue;
       coinciden++;
@@ -211,7 +220,7 @@ async function verCambios() {
     }
     cambiosWoo = { cfg, simples, variaciones, filas };
     $('wooResumen').textContent = `${coinciden} SKUs de Bidcom están en tu tienda · ${filas.length} con precio distinto · ` +
-      `${productos.length - coinciden} no están en tu tienda (se ignoran).`;
+      `${lista.length - coinciden} no están en tu tienda (se ignoran).`;
     $('wooTabla').innerHTML = '<tr><th>SKU</th><th>Normal actual</th><th>Normal nuevo</th><th>Rebajado actual</th><th>Rebajado nuevo</th></tr>' +
       filas.map((f) => `<tr><td>${esc(f[0])}</td><td class="num">${pesos(f[1])}</td><td class="num"><b>${pesos(f[2])}</b></td>` +
         `<td class="num">${pesos(f[3])}</td><td class="num"><b>${pesos(f[4])}</b></td></tr>`).join('');
@@ -256,5 +265,6 @@ $('btnExtraer').addEventListener('click', extraerTodo);
 $('btnCsv').addEventListener('click', descargarCsv);
 $('btnVer').addEventListener('click', verCambios);
 $('btnAplicar').addEventListener('click', aplicarCambios);
-for (const id of ['categorias', 'excluir', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
+$('excluir').addEventListener('input', () => { guardar(); mostrarResultados(); });
+for (const id of ['categorias', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
 cargar();

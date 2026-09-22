@@ -24,7 +24,7 @@ class TestScraper(unittest.TestCase):
             "GAD001": (545907, None),         # sin rebaja
             "DRDJI100": (3999998, 1799999),   # carga diferida al hacer scroll
             "DRDJI200": (5999998, 2999999),   # página 2, sin tachado pero con % OFF
-            "REFDJI01": (900000, 700000),     # se extrae; lo descarta main() por prefijo
+            "REF-DRDJI073": (900000, 700000),     # se extrae; lo descarta main() por prefijo
         })
 
 

@@ -48,6 +48,11 @@ class TestExtension(unittest.TestCase):
             page.fill("#categorias", f"http://127.0.0.1:{mock.server_port}/p1.html")
             page.click("#btnExtraer")
             page.wait_for_selector("text=Listo", timeout=90_000)
+            self.assertNotIn("REF-", page.inner_text("#tabla"))
+            self.assertIn("1 descartados", page.inner_text("#resumen"))
+            page.fill("#excluir", "")  # sin filtro aparece al instante
+            self.assertIn("REF-DRDJI073", page.inner_text("#tabla"))
+            page.fill("#excluir", "REF, USA")
             with page.expect_download() as dl:
                 page.click("#btnCsv")
             csv_text = Path(dl.value.path()).read_text(encoding="utf-8-sig")
@@ -65,7 +70,7 @@ class TestExtension(unittest.TestCase):
         mock.shutdown()
         woo.shutdown()
 
-        # REFDJI01 (página 2) queda afuera por el filtro "REF, USA" por defecto
+        # REF-DRDJI073 (página 2) queda afuera por el filtro "REF, USA" por defecto
         self.assertEqual(csv_text.splitlines(), [
             "SKU,Precio normal,Precio rebajado",
             "DRDJI077,6199998,3099999", "DRDJI090,6399998,3199999", "GAD001,545907,",
