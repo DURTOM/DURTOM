@@ -1,0 +1,4 @@
+config.ini
+salida/
+__pycache__/
+.venv/
