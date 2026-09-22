@@ -14,7 +14,10 @@ class TestScraper(unittest.TestCase):
     def test_extract(self):
         cfg = configparser.ConfigParser()
         cfg.read_dict({"scraper": {"espera_ms": "400"}})
-        got = {p["sku"]: (p["normal"], p["sale"]) for p in bidcom_sync.scrape_all([MOCK.as_uri()], cfg)}
+        items = bidcom_sync.scrape_all([MOCK.as_uri()], cfg)
+        names = {p["sku"]: p["name"] for p in items}
+        self.assertEqual(names["DRDJI090"], "Dron DJI Mini 5 Pro Combo")  # no el contador de la oferta
+        got = {p["sku"]: (p["normal"], p["sale"]) for p in items}
         self.assertEqual(got, {
             "DRDJI077": (6199998, 3099999),   # tachado + cuotas + sin impuestos
             "DRDJI090": (6399998, 3199999),   # clase "price-old"

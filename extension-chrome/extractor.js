@@ -102,12 +102,18 @@ function bidcomExtract(opts) {
     }
 
     // nombre: primer texto largo que no sea COD ni precio
+    // (se descartan contadores de ofertas tipo "Finaliza en: 00:58:01")
+    const noEsNombre = (s) => !s || s.length < 8 || codRe.test(s) || s.includes('$') ||
+      /finaliza|termina|\d{1,2}:\d{2}|%\s*off|cuota|env[ií]o/i.test(s);
     let name = '';
-    const title = card.querySelector('h1,h2,h3,h4,[class*="name" i],[class*="title" i]');
-    if (title) name = title.innerText.trim();
+    for (const el of card.querySelectorAll('h1,h2,h3,h4,[class*="name" i],[class*="title" i],[class*="nombre" i]')) {
+      const t = (el.innerText || '').trim();
+      if (!noEsNombre(t)) { name = t; break; }
+    }
     if (!name) {
-      name = (card.innerText || '').split('\n').map(s => s.trim())
-        .find(s => s.length > 8 && !codRe.test(s) && !s.includes('$')) || '';
+      const img = card.querySelector('img[alt]');
+      name = (card.innerText || '').split('\n').map(s => s.trim()).find(s => !noEsNombre(s)) ||
+             (img ? img.alt.trim() : '');
     }
     const a = card.querySelector('a[href]');
     out.push({ sku, name, normal, sale, url: a ? a.href : '' });
