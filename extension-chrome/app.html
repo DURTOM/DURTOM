@@ -27,6 +27,7 @@
   .tabla { max-height: 420px; overflow: auto; border: 1px solid var(--borde); border-radius: 6px; margin-top: 10px; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
   th, td { padding: 6px 10px; border-bottom: 1px solid var(--borde); text-align: left; white-space: nowrap; }
+  td a { color: var(--azul); }
   th { position: sticky; top: 0; background: #eef1f7; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .resumen { font-weight: 600; margin-top: 4px; }
@@ -72,6 +73,14 @@
       <div class="resumen" id="wooResumen"></div>
       <div class="tabla" id="wooTablaBox" hidden><table id="wooTabla"></table></div>
     </details>
+  </section>
+
+  <section id="secFaltantes" hidden>
+    <h2><span class="n">4</span>Productos de Bidcom que no están en tu tienda</h2>
+    <p class="ayuda">Aparece después de tocar "Ver qué cambiaría" en el paso 3. No se modifica nada: es solo una lista para que decidas cuáles cargar.</p>
+    <div class="resumen" id="faltResumen"></div>
+    <button id="btnFaltantes" class="primario">⬇ Descargar esta lista (Excel)</button>
+    <div class="tabla"><table id="faltTabla"></table></div>
   </section>
 </main>
 <script src="app.js"></script>

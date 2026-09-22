@@ -66,6 +66,11 @@ class TestExtension(unittest.TestCase):
             page.on("dialog", lambda d: d.accept())
             page.click("#btnAplicar")
             page.wait_for_selector("text=Tienda actualizada", timeout=20_000)
+            # lista de faltantes: sigue visible después de aplicar, sin REF/USA
+            self.assertTrue(page.is_visible("#secFaltantes"))
+            with page.expect_download() as dl2:
+                page.click("#btnFaltantes")
+            falt = Path(dl2.value.path()).read_text(encoding="utf-8-sig").splitlines()
             ctx.close()
         mock.shutdown()
         woo.shutdown()
@@ -75,6 +80,10 @@ class TestExtension(unittest.TestCase):
             "SKU,Precio normal,Precio rebajado",
             "DRDJI077,6199998,3099999", "DRDJI090,6399998,3199999", "GAD001,545907,",
             "DRDJI100,3999998,1799999", "DRDJI200,5999998,2999999"])
+        self.assertEqual(falt[0], "SKU;Nombre;URL")
+        self.assertEqual([l.split(";")[0] for l in falt[1:]], ["DRDJI090"])
+        self.assertIn("Dron DJI Mini 5 Pro Combo", falt[1])
+        self.assertTrue(falt[1].endswith("/p/2"))
         posts = dict(test_woo.POSTS)
         self.assertEqual(len(posts["/wp-json/wc/v3/products/batch"]["update"]), 2)
         self.assertEqual(len(posts["/wp-json/wc/v3/products/4/variations/batch"]["update"]), 1)

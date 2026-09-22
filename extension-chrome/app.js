@@ -10,6 +10,7 @@ let fechaExtraccion = '';
 const prefijos = () => $('excluir').value.split(/[,;\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
 const excluido = (p) => prefijos().some((x) => p.sku.toUpperCase().startsWith(x));
 const validos = () => productos.filter((p) => !excluido(p));
+let faltantes = [];      // productos de Bidcom cuyo SKU no existe en la tienda
 let cambiosWoo = null;   // {simples: [...], variaciones: {pid: [...]}, filas: [...]}
 
 // ---------- utilidades ----------
@@ -122,6 +123,7 @@ function mostrarResultados() {
   const ok = validos();
   const descartados = productos.length - ok.length;
   cambiosWoo = null; $('btnAplicar').disabled = true; $('wooTablaBox').hidden = true; $('wooResumen').textContent = '';
+  faltantes = []; mostrarFaltantes();
   $('secResultados').hidden = !productos.length;
   const conRebaja = ok.filter((p) => p.sale).length;
   $('resumen').textContent = `${ok.length} productos (${conRebaja} con precio rebajado)` +
@@ -131,18 +133,35 @@ function mostrarResultados() {
       `<td class="num">${pesos(p.normal)}</td><td class="num">${pesos(p.sale)}</td></tr>`).join('');
 }
 
-function descargarCsv() {
-  const q = (s) => /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  const filas = [['SKU', 'Precio normal', 'Precio rebajado'],
-    ...validos().filter((p) => p.normal != null).map((p) => [p.sku, fmt(p.normal), fmt(p.sale)])];
-  const csv = '﻿' + filas.map((f) => f.map(q).join(',')).join('\r\n') + '\r\n';
+// sep ',' para el importador de WooCommerce; ';' para que Excel (config. Argentina) abra columnas.
+function bajarCsv(nombre, filas, sep = ',') {
+  const q = (s) => (/[",;\n]/.test(s) ? `"${String(s).replace(/"/g, '""')}"` : s);
+  const csv = '\ufeff' + filas.map((f) => f.map(q).join(sep)).join('\r\n') + '\r\n';
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = `bidcom_precios_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.csv`;
+  a.download = `${nombre}_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function descargarCsv() {
+  bajarCsv('bidcom_precios', [['SKU', 'Precio normal', 'Precio rebajado'],
+    ...validos().filter((p) => p.normal != null).map((p) => [p.sku, fmt(p.normal), fmt(p.sale)])]);
+}
+
+function descargarFaltantes() {
+  bajarCsv('bidcom_no_estan_en_mi_tienda', [['SKU', 'Nombre', 'URL'],
+    ...faltantes.map((p) => [p.sku, p.name || '', p.url || ''])], ';');
+}
+
+function mostrarFaltantes() {
+  $('secFaltantes').hidden = !faltantes.length;
+  $('faltResumen').textContent = `${faltantes.length} productos de Bidcom no están en tu tienda (sin ${prefijos().join(', ') || 'filtro'}).`;
+  $('faltTabla').innerHTML = '<tr><th>SKU</th><th>Nombre</th><th>URL</th></tr>' +
+    faltantes.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 70)}</td>` +
+      `<td>${p.url ? `<a href="${esc(p.url)}" target="_blank">Ver en Bidcom</a>` : ''}</td></tr>`).join('');
 }
 
 // ---------- WooCommerce ----------
@@ -204,12 +223,13 @@ async function verCambios() {
   try {
     const mapa = await wooMapaSku(cfg);
     const borrar = $('wooBorrar').checked;
-    const simples = [], variaciones = {}, filas = [];
+    const simples = [], variaciones = {}, filas = [], nuevos = [];
     let coinciden = 0;
     const lista = validos();
     for (const p of lista) {
       const cur = mapa[p.sku.toUpperCase()];
-      if (!cur || p.normal == null) continue;
+      if (!cur) { nuevos.push(p); continue; }
+      if (p.normal == null) continue;
       coinciden++;
       const reg = fmt(p.normal);
       const sale = p.sale ? fmt(p.sale) : (borrar ? '' : (cur.sale_price || ''));
@@ -219,8 +239,10 @@ async function verCambios() {
       filas.push([p.sku, cur.regular_price, reg, cur.sale_price, sale]);
     }
     cambiosWoo = { cfg, simples, variaciones, filas };
+    faltantes = nuevos;
+    mostrarFaltantes();
     $('wooResumen').textContent = `${coinciden} SKUs de Bidcom están en tu tienda · ${filas.length} con precio distinto · ` +
-      `${lista.length - coinciden} no están en tu tienda (se ignoran).`;
+      `${nuevos.length} no están en tu tienda (ver lista abajo).`;
     $('wooTabla').innerHTML = '<tr><th>SKU</th><th>Normal actual</th><th>Normal nuevo</th><th>Rebajado actual</th><th>Rebajado nuevo</th></tr>' +
       filas.map((f) => `<tr><td>${esc(f[0])}</td><td class="num">${pesos(f[1])}</td><td class="num"><b>${pesos(f[2])}</b></td>` +
         `<td class="num">${pesos(f[3])}</td><td class="num"><b>${pesos(f[4])}</b></td></tr>`).join('');
@@ -265,6 +287,7 @@ $('btnExtraer').addEventListener('click', extraerTodo);
 $('btnCsv').addEventListener('click', descargarCsv);
 $('btnVer').addEventListener('click', verCambios);
 $('btnAplicar').addEventListener('click', aplicarCambios);
+$('btnFaltantes').addEventListener('click', descargarFaltantes);
 $('excluir').addEventListener('input', () => { guardar(); mostrarResultados(); });
 for (const id of ['categorias', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
 cargar();
