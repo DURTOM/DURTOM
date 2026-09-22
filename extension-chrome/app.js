@@ -9,7 +9,22 @@ let fechaExtraccion = '';
 // descargar y actualizar, así un cambio en el casillero vale al instante.
 const prefijos = () => $('excluir').value.split(/[,;\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
 const excluido = (p) => prefijos().some((x) => p.sku.toUpperCase().startsWith(x));
-const validos = () => productos.filter((p) => !excluido(p));
+
+// Filtro de marcas: si hay marcas cargadas, solo quedan los productos cuyo nombre
+// (o dirección) las menciona como palabra completa. Sin tildes ni mayúsculas.
+const normalizar = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const listaMarcas = (id) => $(id).value.split(/[,;\n]+/).map((s) => normalizar(s).trim()).filter(Boolean);
+const esc_re = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function mencionaAlguna(p, lista) {
+  const texto = ' ' + normalizar(p.name + ' ' + (p.url || '').replace(/[\/_-]+/g, ' ')) + ' ';
+  return lista.some((m) => new RegExp('[^a-z0-9]' + esc_re(m).replace(/\s+/g, '[^a-z0-9]+') + '[^a-z0-9]').test(texto));
+}
+function deMarca(p) {
+  const solo = listaMarcas('marcas'), fuera = listaMarcas('marcasFuera');
+  if (fuera.length && mencionaAlguna(p, fuera)) return false;
+  return !solo.length || mencionaAlguna(p, solo);
+}
+const validos = () => productos.filter((p) => !excluido(p) && deMarca(p));
 let faltantes = [];      // productos de Bidcom cuyo SKU no existe en la tienda
 let cambiosWoo = null;   // {simples: [...], variaciones: {pid: [...]}, filas: [...]}
 
@@ -31,6 +46,8 @@ function guardar() {
   chrome.storage.local.set({
     categorias: $('categorias').value,
     excluir: $('excluir').value,
+    marcas: $('marcas').value,
+    marcasFuera: $('marcasFuera').value,
     wooUrl: $('wooUrl').value.trim(), wooCk: $('wooCk').value.trim(), wooCs: $('wooCs').value.trim(),
     wooBorrar: $('wooBorrar').checked,
   });
@@ -40,6 +57,8 @@ async function cargar() {
   const d = await chrome.storage.local.get(null);
   $('categorias').value = d.categorias ?? 'https://www.bidcom.com.ar/drones';
   $('excluir').value = d.excluir ?? 'REF, USA';
+  $('marcas').value = d.marcas ?? '';
+  $('marcasFuera').value = d.marcasFuera ?? '';
   $('wooUrl').value = d.wooUrl ?? '';
   $('wooCk').value = d.wooCk ?? '';
   $('wooCs').value = d.wooCs ?? '';
@@ -121,13 +140,15 @@ async function extraerTodo() {
 
 function mostrarResultados() {
   const ok = validos();
-  const descartados = productos.length - ok.length;
+  const porSku = productos.filter(excluido).length;
+  const porMarca = productos.filter((p) => !excluido(p) && !deMarca(p)).length;
   cambiosWoo = null; $('btnAplicar').disabled = true; $('wooTablaBox').hidden = true; $('wooResumen').textContent = '';
   faltantes = []; mostrarFaltantes();
   $('secResultados').hidden = !productos.length;
   const conRebaja = ok.filter((p) => p.sale).length;
   $('resumen').textContent = `${ok.length} productos (${conRebaja} con precio rebajado)` +
-    (descartados ? ` · ${descartados} descartados por SKU (${prefijos().join(', ')})` : '') + ` — ${fechaExtraccion || ''}`;
+    (porSku ? ` · ${porSku} descartados por SKU (${prefijos().join(', ')})` : '') +
+    (porMarca ? ` · ${porMarca} de otras marcas` : '') + ` — ${fechaExtraccion || ''}`;
   $('tabla').innerHTML = '<tr><th>SKU</th><th>Producto</th><th>Precio normal</th><th>Precio rebajado</th></tr>' +
     ok.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 60)}</td>` +
       `<td class="num">${pesos(p.normal)}</td><td class="num">${pesos(p.sale)}</td></tr>`).join('');
@@ -158,7 +179,7 @@ function descargarFaltantes() {
 
 function mostrarFaltantes() {
   $('secFaltantes').hidden = !faltantes.length;
-  $('faltResumen').textContent = `${faltantes.length} productos de Bidcom no están en tu tienda (sin ${prefijos().join(', ') || 'filtro'}).`;
+  $('faltResumen').textContent = `${faltantes.length} productos de Bidcom no están en tu tienda (con tus filtros de SKU y marcas).`;
   $('faltTabla').innerHTML = '<tr><th>SKU</th><th>Nombre</th><th>URL</th></tr>' +
     faltantes.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 70)}</td>` +
       `<td>${p.url ? `<a href="${esc(p.url)}" target="_blank">${esc(p.url)}</a>` : ''}</td></tr>`).join('');
@@ -288,6 +309,6 @@ $('btnCsv').addEventListener('click', descargarCsv);
 $('btnVer').addEventListener('click', verCambios);
 $('btnAplicar').addEventListener('click', aplicarCambios);
 $('btnFaltantes').addEventListener('click', descargarFaltantes);
-$('excluir').addEventListener('input', () => { guardar(); mostrarResultados(); });
+for (const id of ['excluir', 'marcas', 'marcasFuera']) $(id).addEventListener('input', () => { guardar(); mostrarResultados(); });
 for (const id of ['categorias', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
 cargar();

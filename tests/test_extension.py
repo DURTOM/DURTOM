@@ -53,6 +53,17 @@ class TestExtension(unittest.TestCase):
             page.fill("#excluir", "")  # sin filtro aparece al instante
             self.assertIn("REF-DRDJI073", page.inner_text("#tabla"))
             page.fill("#excluir", "REF, USA")
+            # filtro de marcas (sin mayúsculas ni tildes): solo DJI -> el Gadnic queda afuera
+            page.fill("#marcas", "dji")
+            self.assertNotIn("GAD001", page.inner_text("#tabla"))
+            self.assertIn("1 de otras marcas", page.inner_text("#resumen"))
+            page.fill("#marcas", "DJI, Gádnic")
+            self.assertIn("GAD001", page.inner_text("#tabla"))
+            page.fill("#marcas", "")
+            page.fill("#marcasFuera", "gadnic")  # excluir una marca
+            self.assertNotIn("GAD001", page.inner_text("#tabla"))
+            self.assertIn("DRDJI077", page.inner_text("#tabla"))
+            page.fill("#marcasFuera", "")
             with page.expect_download() as dl:
                 page.click("#btnCsv")
             csv_text = Path(dl.value.path()).read_text(encoding="utf-8-sig")
