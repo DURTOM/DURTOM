@@ -24,3 +24,9 @@ OPCIONAL: que actualice la tienda sin importar el CSV
   (WooCommerce > Ajustes > Avanzado > API REST > Anadir clave, Lectura/Escritura).
 - "Ver que cambiaria" muestra la lista; "Aplicar cambios" los guarda.
   Solo cambia los SKU que existen en tu tienda. Las claves quedan guardadas.
+
+ACTUALIZAR A UNA VERSION NUEVA
+1. Descomprimi el ZIP nuevo y copia sus archivos adentro de tu carpeta
+   "Bidcom-Precios" (reemplazar los existentes).
+2. En chrome://extensions toca la flecha circular de "Bidcom Precios".
+   Tus categorias y claves quedan guardadas.

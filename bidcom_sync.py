@@ -299,6 +299,11 @@ def main():
     categories = args.url or [l.strip() for l in cfg.get("bidcom", "categorias").splitlines()
                               if l.strip() and not l.strip().startswith("#")]
     products = scrape_all(categories, cfg, headed=args.ver)
+    prefijos = [x.strip().upper() for x in re.split(r"[,;\s]+", cfg.get("bidcom", "excluir_prefijos", fallback="REF, USA")) if x.strip()]
+    descartados = [p for p in products if p["sku"].upper().startswith(tuple(prefijos))] if prefijos else []
+    if descartados:
+        log.info("Se descartan %d productos por SKU (%s).", len(descartados), ", ".join(prefijos))
+        products = [p for p in products if p not in descartados]
     if not products:
         log.error("No se extrajo ningún producto. Probá con --ver para mirar qué pasa.")
         return 1

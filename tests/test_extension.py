@@ -65,6 +65,7 @@ class TestExtension(unittest.TestCase):
         mock.shutdown()
         woo.shutdown()
 
+        # REFDJI01 (página 2) queda afuera por el filtro "REF, USA" por defecto
         self.assertEqual(csv_text.splitlines(), [
             "SKU,Precio normal,Precio rebajado",
             "DRDJI077,6199998,3099999", "DRDJI090,6399998,3199999", "GAD001,545907,",

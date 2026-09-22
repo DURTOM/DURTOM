@@ -22,6 +22,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 function guardar() {
   chrome.storage.local.set({
     categorias: $('categorias').value,
+    excluir: $('excluir').value,
     wooUrl: $('wooUrl').value.trim(), wooCk: $('wooCk').value.trim(), wooCs: $('wooCs').value.trim(),
     wooBorrar: $('wooBorrar').checked,
   });
@@ -30,6 +31,7 @@ function guardar() {
 async function cargar() {
   const d = await chrome.storage.local.get(null);
   $('categorias').value = d.categorias ?? 'https://www.bidcom.com.ar/drones';
+  $('excluir').value = d.excluir ?? 'REF, USA';
   $('wooUrl').value = d.wooUrl ?? '';
   $('wooCk').value = d.wooCk ?? '';
   $('wooCs').value = d.wooCs ?? '';
@@ -57,7 +59,7 @@ async function extraerCategoria(tabId, url) {
   const encontrados = {};
   const visitadas = new Set();
   let actual = url;
-  for (let pag = 0; pag < 30 && actual && !visitadas.has(actual); pag++) {
+  for (let pag = 0; pag < 100 && actual && !visitadas.has(actual); pag++) {
     visitadas.add(actual);
     const cargada = esperarCarga(tabId);
     await chrome.tabs.update(tabId, { url: actual });
@@ -100,7 +102,10 @@ async function extraerTodo() {
     if (miPestana) await chrome.tabs.update(miPestana.id, { active: true });
     $('btnExtraer').disabled = false;
   }
-  productos = Object.values(todos);
+  const prefijos = $('excluir').value.split(/[,;\s]+/).map((s) => s.trim().toUpperCase()).filter(Boolean);
+  const excluidos = Object.values(todos).filter((p) => prefijos.some((x) => p.sku.toUpperCase().startsWith(x)));
+  productos = Object.values(todos).filter((p) => !excluidos.includes(p));
+  if (excluidos.length) estado(`   Se descartaron ${excluidos.length} productos por SKU (${prefijos.join(', ')}).`);
   const sinPrecio = productos.filter((p) => p.normal == null);
   estado(`✔ Listo: ${productos.length} productos.` + (sinPrecio.length ? ` (${sinPrecio.length} sin precio)` : ''), 'ok');
   const fecha = new Date().toLocaleString('es-AR');
@@ -251,5 +256,5 @@ $('btnExtraer').addEventListener('click', extraerTodo);
 $('btnCsv').addEventListener('click', descargarCsv);
 $('btnVer').addEventListener('click', verCambios);
 $('btnAplicar').addEventListener('click', aplicarCambios);
-for (const id of ['categorias', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
+for (const id of ['categorias', 'excluir', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
 cargar();

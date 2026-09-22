@@ -142,7 +142,7 @@ async function bidcomLoadAll(waitMs) {
   const count = () => ((document.body.innerText || '').match(re) || []).length;
   for (let i = 0; i < 40 && count() === 0; i++) await sleep(500);
   let last = -1;
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 200; i++) {
     window.scrollTo(0, document.body.scrollHeight);
     await sleep(waitMs);
     const clicked = bidcomLoadMore();
