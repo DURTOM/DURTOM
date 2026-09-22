@@ -115,10 +115,42 @@ function bidcomExtract(opts) {
       name = (card.innerText || '').split('\n').map(s => s.trim()).find(s => !noEsNombre(s)) ||
              (img ? img.alt.trim() : '');
     }
-    const a = card.querySelector('a[href]');
-    out.push({ sku, name, normal, sale, url: a ? a.href : '' });
+    out.push({ sku, name, normal, sale, url: bidcomProductUrl(card, countCods) });
   }
   return out;
+}
+
+// Link a la página del producto (ej. https://www.bidcom.com.ar/estabilizadores/estabilizador-...).
+// Puede estar adentro de la tarjeta, o la tarjeta entera puede estar envuelta en el <a>.
+function bidcomProductUrl(card, countCods) {
+  const util = (a) => {
+    const href = a && a.getAttribute('href');
+    if (!href || href.startsWith('#') || /^(javascript|mailto|tel|whatsapp):/i.test(href)) return null;
+    let u;
+    try { u = new URL(a.href, location.href); } catch (e) { return null; }
+    if (u.host !== location.host) return null;
+    if (/(carrito|cart|checkout|login|cuenta|favorit|wishlist|compar)/i.test(u.pathname)) return null;
+    if (u.pathname === location.pathname || u.pathname === '/') return null;
+    return u.href.split('#')[0];
+  };
+  // 1) la tarjeta está adentro de un link
+  const envolvente = util(card.closest('a[href]'));
+  if (envolvente) return envolvente;
+  // 2) links dentro de la tarjeta, y si no hay, en contenedores cercanos con un solo producto
+  for (let box = card, i = 0; box && i < 4; box = box.parentElement, i++) {
+    if (i > 0 && countCods(box) > 1) break;
+    const cands = Array.from(box.querySelectorAll('a[href]')).map(util).filter(Boolean);
+    if (cands.length) {
+      // el más repetido suele ser el del producto (imagen + título apuntan al mismo)
+      const votos = {};
+      for (const c of cands) votos[c] = (votos[c] || 0) + 1;
+      return cands.sort((x, y) => votos[y] - votos[x] || y.length - x.length)[0];
+    }
+  }
+  // 3) atributos de datos que usan algunos sitios
+  const d = card.closest('[data-href],[data-url],[data-link]');
+  if (d) return new URL(d.dataset.href || d.dataset.url || d.dataset.link, location.href).href;
+  return '';
 }
 
 function bidcomLoadMore() {

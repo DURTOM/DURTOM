@@ -83,7 +83,7 @@ class TestExtension(unittest.TestCase):
         self.assertEqual(falt[0], "SKU;Nombre;URL")
         self.assertEqual([l.split(";")[0] for l in falt[1:]], ["DRDJI090"])
         self.assertIn("Dron DJI Mini 5 Pro Combo", falt[1])
-        self.assertTrue(falt[1].endswith("/p/2"))
+        self.assertTrue(falt[1].endswith("/drones/dron-dji-mini-5-pro-combo"))
         posts = dict(test_woo.POSTS)
         self.assertEqual(len(posts["/wp-json/wc/v3/products/batch"]["update"]), 2)
         self.assertEqual(len(posts["/wp-json/wc/v3/products/4/variations/batch"]["update"]), 1)
