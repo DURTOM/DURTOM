@@ -20,8 +20,7 @@ function mencionaAlguna(p, lista) {
   return lista.some((m) => new RegExp('[^a-z0-9]' + esc_re(m).replace(/\s+/g, '[^a-z0-9]+') + '[^a-z0-9]').test(texto));
 }
 function deMarca(p) {
-  const solo = listaMarcas('marcas'), fuera = listaMarcas('marcasFuera');
-  if (fuera.length && mencionaAlguna(p, fuera)) return false;
+  const solo = listaMarcas('marcas');
   return !solo.length || mencionaAlguna(p, solo);
 }
 const validos = () => productos.filter((p) => !excluido(p) && deMarca(p));
@@ -47,7 +46,6 @@ function guardar() {
     categorias: $('categorias').value,
     excluir: $('excluir').value,
     marcas: $('marcas').value,
-    marcasFuera: $('marcasFuera').value,
     wooUrl: $('wooUrl').value.trim(), wooCk: $('wooCk').value.trim(), wooCs: $('wooCs').value.trim(),
     wooBorrar: $('wooBorrar').checked,
   });
@@ -58,7 +56,6 @@ async function cargar() {
   $('categorias').value = d.categorias ?? 'https://www.bidcom.com.ar/drones';
   $('excluir').value = d.excluir ?? 'REF, USA';
   $('marcas').value = d.marcas ?? '';
-  $('marcasFuera').value = d.marcasFuera ?? '';
   $('wooUrl').value = d.wooUrl ?? '';
   $('wooCk').value = d.wooCk ?? '';
   $('wooCs').value = d.wooCs ?? '';
@@ -309,6 +306,6 @@ $('btnCsv').addEventListener('click', descargarCsv);
 $('btnVer').addEventListener('click', verCambios);
 $('btnAplicar').addEventListener('click', aplicarCambios);
 $('btnFaltantes').addEventListener('click', descargarFaltantes);
-for (const id of ['excluir', 'marcas', 'marcasFuera']) $(id).addEventListener('input', () => { guardar(); mostrarResultados(); });
+for (const id of ['excluir', 'marcas']) $(id).addEventListener('input', () => { guardar(); mostrarResultados(); });
 for (const id of ['categorias', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
 cargar();
