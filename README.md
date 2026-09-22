@@ -1,14 +1,18 @@
 # Bidcom → WooCommerce: actualizador de precios por SKU
 
-Automatiza lo que hacías a mano con la extensión **Web Scraper**:
+Reemplaza el trabajo manual con Web Scraper: toma de cada categoría de Bidcom el **SKU** (`COD. DRDJI077`), el **precio normal** y el **precio rebajado**. Con eso genera el CSV para WooCommerce o actualiza la tienda directamente, **solo en los SKU que ya existen**.
 
-1. Abre cada categoría de bidcom.com.ar que configures (por ejemplo `https://www.bidcom.com.ar/drones`).
-2. Carga **todos** los productos (hace scroll, pulsa "Ver más" y sigue la paginación).
-3. De cada producto toma **SKU** (el `COD. DRDJI077` de la tarjeta), **precio normal** (tachado) y **precio rebajado**.
-4. Genera un **CSV** listo para importar en WooCommerce (`SKU, Precio normal, Precio rebajado`).
-5. De forma opcional, **actualiza la tienda directamente** por la API de WooCommerce, **solo en los SKU que ya existen**. Los que no están en tu tienda se ignoran.
+## Forma recomendada: extensión de Chrome (no hay que instalar nada más)
 
-No depende de las clases CSS de Bidcom: busca el texto `COD.` y los precios `$` de cada tarjeta. Ignora los montos de cuotas, el "precio sin impuestos nacionales" y el "ahorrás".
+1. Descargá **`Bidcom-Precios.zip`** y descomprimilo con clic derecho → "Extraer todo".
+2. En Chrome, entrá a `chrome://extensions`, activá **Modo de desarrollador** y hacé clic en **Cargar descomprimida**. Elegí la carpeta `Bidcom-Precios`.
+3. Hacé clic en el ícono azul **B**, pegá las categorías y tocá **Extraer precios**. Después tocá **Descargar CSV** o, si lo configuraste, **Aplicar cambios en la tienda**.
+
+Las instrucciones paso a paso están en `extension-chrome/LEEME.txt`.
+
+---
+
+## Forma avanzada: programa en Python (para correr automático sin abrir Chrome)
 
 ## Instalación (Windows)
 

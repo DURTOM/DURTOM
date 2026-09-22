@@ -1,0 +1,26 @@
+BIDCOM PRECIOS - Extension de Chrome
+====================================
+
+INSTALAR (una sola vez, 2 minutos)
+1. Descomprimi el ZIP (clic derecho > "Extraer todo"). Queda una carpeta
+   llamada "Bidcom-Precios". Guardala en un lugar fijo, por ejemplo Documentos.
+   No la borres: Chrome la usa.
+2. En Chrome, escribi en la barra de direcciones:  chrome://extensions  y Enter.
+3. Arriba a la derecha activa el interruptor "Modo de desarrollador".
+4. Clic en "Cargar descomprimida" y elegi la carpeta "Bidcom-Precios".
+5. Clic en el icono de rompecabezas (arriba a la derecha de Chrome) y en el
+   alfiler al lado de "Bidcom Precios" para que quede siempre visible.
+
+USAR (cada vez que quieras actualizar precios)
+1. Clic en el icono azul "B" de la barra de Chrome. Se abre la pantalla.
+2. Paso 1: pega las direcciones de las categorias de Bidcom (una por renglon)
+   y toca "Extraer precios". Chrome abre Bidcom solo, junta todo y cierra
+   la pestana. No toques esa pestana mientras trabaja.
+3. Paso 2: toca "Descargar CSV para WooCommerce" e importalo como siempre
+   (Productos > Importar > "Actualizar productos existentes").
+
+OPCIONAL: que actualice la tienda sin importar el CSV
+- Abri el paso 3, carga la direccion de tu tienda y las 2 claves de WooCommerce
+  (WooCommerce > Ajustes > Avanzado > API REST > Anadir clave, Lectura/Escritura).
+- "Ver que cambiaria" muestra la lista; "Aplicar cambios" los guarda.
+  Solo cambia los SKU que existen en tu tienda. Las claves quedan guardadas.

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Bidcom Precios</title>
+<link rel="icon" href="icon48.png">
+<style>
+  :root { --azul: #0b3df5; --gris: #f3f5f9; --borde: #d9dee8; --texto: #1d2433; --ok: #0a7d3b; --err: #c62828; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, "Segoe UI", Arial, sans-serif; color: var(--texto); background: var(--gris); }
+  header { background: var(--azul); color: #fff; padding: 16px 24px; font-size: 20px; font-weight: 600; }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+  section { background: #fff; border: 1px solid var(--borde); border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
+  h2 { margin: 0 0 6px; font-size: 17px; }
+  h2 .n { display: inline-block; width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 50%; background: var(--azul); color: #fff; margin-right: 8px; font-size: 14px; }
+  p.ayuda { margin: 0 0 12px; color: #5b6477; font-size: 14px; }
+  textarea, input[type=text], input[type=password] { width: 100%; padding: 9px 10px; border: 1px solid var(--borde); border-radius: 6px; font: inherit; }
+  textarea { min-height: 110px; font-family: Consolas, monospace; font-size: 13px; }
+  label { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 14px; }
+  label.check { font-weight: 400; display: flex; gap: 8px; align-items: center; }
+  button { font: inherit; font-weight: 600; padding: 10px 18px; border-radius: 8px; border: 2px solid var(--azul); cursor: pointer; margin: 12px 8px 0 0; }
+  button.primario { background: var(--azul); color: #fff; }
+  button.secundario { background: #fff; color: var(--azul); }
+  button:disabled { opacity: .45; cursor: default; }
+  #estado { margin-top: 12px; font-size: 14px; white-space: pre-wrap; max-height: 160px; overflow: auto; background: var(--gris); border-radius: 6px; padding: 8px 10px; display: none; }
+  .ok { color: var(--ok); } .err { color: var(--err); }
+  .tabla { max-height: 420px; overflow: auto; border: 1px solid var(--borde); border-radius: 6px; margin-top: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--borde); text-align: left; white-space: nowrap; }
+  th { position: sticky; top: 0; background: #eef1f7; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .resumen { font-weight: 600; margin-top: 4px; }
+  details summary { cursor: pointer; font-weight: 600; font-size: 17px; }
+  .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+  @media (max-width: 640px) { .fila { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>Bidcom Precios</header>
+<main>
+  <section>
+    <h2><span class="n">1</span>Categorías de Bidcom</h2>
+    <p class="ayuda">Pegá la dirección de cada categoría, una por renglón (copiala de la barra del navegador, por ejemplo <b>https://www.bidcom.com.ar/drones</b>).</p>
+    <textarea id="categorias" spellcheck="false"></textarea>
+    <button id="btnExtraer" class="primario">▶ Extraer precios</button>
+    <div id="estado"></div>
+  </section>
+
+  <section id="secResultados" hidden>
+    <h2><span class="n">2</span>Resultados</h2>
+    <div class="resumen" id="resumen"></div>
+    <button id="btnCsv" class="primario">⬇ Descargar CSV para WooCommerce</button>
+    <p class="ayuda" style="margin-top:10px">Después lo importás como siempre: WordPress → Productos → Importar → marcá <b>"Actualizar productos existentes"</b>.</p>
+    <div class="tabla"><table id="tabla"></table></div>
+  </section>
+
+  <section>
+    <details id="detWoo">
+      <summary><span class="n" style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--azul);color:#fff;margin-right:8px;font-size:14px">3</span>Opcional: actualizar la tienda directo (sin importar el CSV)</summary>
+      <p class="ayuda" style="margin-top:10px">Se configura una sola vez. En WordPress: WooCommerce → Ajustes → Avanzado → API REST → <b>Añadir clave</b>, permisos <b>Lectura/Escritura</b>. Copiá acá las dos claves que te muestra.</p>
+      <label for="wooUrl">Dirección de tu tienda</label>
+      <input type="text" id="wooUrl" placeholder="https://mitienda.com.ar">
+      <div class="fila">
+        <div><label for="wooCk">Clave del cliente (empieza con ck_)</label><input type="password" id="wooCk"></div>
+        <div><label for="wooCs">Clave secreta (empieza con cs_)</label><input type="password" id="wooCs"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="wooBorrar" checked> Si en Bidcom no hay descuento, quitar el precio rebajado en mi tienda</label>
+      <button id="btnVer" class="secundario">🔍 Ver qué cambiaría</button>
+      <button id="btnAplicar" class="primario" disabled>✔ Aplicar cambios en la tienda</button>
+      <div class="resumen" id="wooResumen"></div>
+      <div class="tabla" id="wooTablaBox" hidden><table id="wooTabla"></table></div>
+    </details>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
