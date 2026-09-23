@@ -94,17 +94,35 @@ async function enPestana(tabId, func, args = []) {
   return r ? r.result : undefined;
 }
 
+// Abre una dirección en la pestaña de trabajo, espera la carga y le inyecta el extractor.
+async function irA(tabId, url) {
+  const cargada = esperarCarga(tabId);
+  cargada.catch(() => {});  // si falla la navegación, el error sale abajo
+  await chrome.tabs.update(tabId, { url });
+  await cargada;
+  await chrome.scripting.executeScript({ target: { tabId }, files: ['extractor.js'] });
+}
+
+// Oferta relámpago: el precio normal está en la página (ficha) del producto.
+async function precioDeFicha(tabId, url) {
+  await irA(tabId, url);
+  return enPestana(tabId, async () => {
+    for (let i = 0; i < 20; i++) {  // la ficha puede tardar en dibujar el precio
+      const r = bidcomPrecioFicha();
+      if (r && r.normal != null) return r;
+      await new Promise((ok) => setTimeout(ok, 500));
+    }
+    return null;
+  });
+}
+
 async function extraerCategoria(tabId, url) {
   const encontrados = {};
   const visitadas = new Set();
   let actual = url;
   for (let pag = 0; pag < 100 && actual && !visitadas.has(actual); pag++) {
     visitadas.add(actual);
-    const cargada = esperarCarga(tabId);
-    cargada.catch(() => {});  // si falla la navegación, el error sale abajo
-    await chrome.tabs.update(tabId, { url: actual });
-    await cargada;
-    await chrome.scripting.executeScript({ target: { tabId }, files: ['extractor.js'] });
+    await irA(tabId, actual);
     const visibles = await enPestana(tabId, (ms) => bidcomLoadAll(ms), [ESPERA_MS]);
     if (!visibles && pag === 0) {
       // categoría principal sin productos: devolver sus subcategorías para recorrerlas
@@ -163,6 +181,24 @@ async function extraerTodo() {
         }
       }
     }
+    if ($('sinRelampago').checked) {
+      const rel = Object.values(todos).filter((p) => p.relampago && p.url && !excluido(p) && deMarca(p));
+      if (rel.length) {
+        estado(`Buscando el precio normal de ${rel.length} ofertas relámpago en la página de cada producto…`);
+        let ok = 0;
+        for (const [n, p] of rel.entries()) {
+          try {
+            const r = await precioDeFicha((await pestanaViva()).id, p.url);
+            if (r && r.normal != null && !r.relampago) {
+              Object.assign(p, { normal: r.normal, sale: r.sale, relampago: false, deFicha: true });
+              ok++;
+            }
+          } catch (e) { /* queda sin actualizar */ }
+          if ((n + 1) % 10 === 0) estado(`   ${n + 1} de ${rel.length} revisadas…`);
+        }
+        estado(`   ${ok} con precio normal de la ficha` + (rel.length - ok ? ` · ${rel.length - ok} no se pudieron leer (no se actualizan)` : '') + '.');
+      }
+    }
   } finally {
     if (tab) { try { await chrome.tabs.remove(tab.id); } catch (e) { /* ya cerrada */ } }
     if (miPestana) await chrome.tabs.update(miPestana.id, { active: true });
@@ -189,10 +225,11 @@ function mostrarResultados() {
   $('resumen').textContent = `${ok.length} productos (${conRebaja} con precio rebajado)` +
     (porSku ? ` · ${porSku} descartados por SKU (${prefijos().join(', ')})` : '') +
     (porMarca ? ` · ${porMarca} de otras marcas` : '') +
-    (porRelampago.length ? ` · ${porRelampago.length} en oferta "Sólo por hoy" (no se actualizan: ${porRelampago.map((p) => p.sku).join(', ')})` : '') +
+    (ok.some((p) => p.deFicha) ? ` · ${ok.filter((p) => p.deFicha).length} en oferta relámpago con precio normal de la ficha (⚡)` : '') +
+    (porRelampago.length ? ` · ${porRelampago.length} en oferta "Sólo por hoy" sin precio normal (no se actualizan: ${porRelampago.map((p) => p.sku).join(', ')})` : '') +
     ` — ${fechaExtraccion || ''}`;
   $('tabla').innerHTML = '<tr><th>SKU</th><th>Producto</th><th>Precio normal</th><th>Precio rebajado</th></tr>' +
-    ok.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 60)}</td>` +
+    ok.map((p) => `<tr><td>${esc(p.sku)}</td><td>${p.deFicha ? '⚡ ' : ''}${esc(p.name).slice(0, 60)}</td>` +
       `<td class="num">${pesos(p.normal)}</td><td class="num">${pesos(p.sale)}</td></tr>`).join('');
 }
 

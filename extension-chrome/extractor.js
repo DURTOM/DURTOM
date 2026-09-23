@@ -11,24 +11,6 @@ var BIDCOM_COD_REGEX = '\\bCOD[.:]\\s*([A-Z0-9][A-Z0-9\\-_/]{2,})';
 function bidcomExtract(opts) {
   opts = Object.assign({ codRegex: BIDCOM_COD_REGEX, minPrice: 100 }, opts || {});
   const codRe = new RegExp(opts.codRegex);
-  const priceRe = /\$\s*([\d.]+(?:,\d{1,2})?)/g;
-  const skipRe = /cuota|impuesto|imp\.|ahorr|env[ií]o|desde|x mes|mensual/i;
-
-  const parsePrice = (s) => {
-    const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
-    return isFinite(n) ? n : null;
-  };
-  const isStruck = (el) => {
-    for (let e = el; e && e.nodeType === 1; e = e.parentElement) {
-      if (['DEL', 'S', 'STRIKE'].includes(e.tagName)) return true;
-      const td = getComputedStyle(e).textDecorationLine || '';
-      if (td.includes('line-through')) return true;
-      const cls = (e.className && e.className.baseVal !== undefined) ? e.className.baseVal : (e.className || '');
-      if (/(old|list|before|regular|tachad|strike|previous|original)/i.test(cls)) return true;
-      if (e.dataset && e.dataset.card) break;
-    }
-    return false;
-  };
 
   // 1) nodos de texto con "COD."
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -64,42 +46,7 @@ function bidcomExtract(opts) {
       card = card.parentElement;
     }
     seen.add(card);
-    card.dataset.card = '1';
-
-    // 3) precios: cada elemento "hoja" que contenga $
-    const prices = [];
-    const els = card.querySelectorAll('*');
-    for (const el of els) {
-      const own = Array.from(el.childNodes)
-        .filter(c => c.nodeType === 3).map(c => c.textContent).join(' ');
-      const text = own.includes('$') ? own : (el.children.length === 0 ? el.textContent : '');
-      if (!text || !text.includes('$')) continue;
-      // contexto corto: "12 cuotas de $X", "Precio sin impuestos $Y"
-      const par = el.parentElement;
-      const ptxt = (par && par !== card) ? (par.textContent || '').trim() : '';
-      const context = ptxt.length <= 80 ? ptxt : text;
-      if (skipRe.test(text) || skipRe.test(context)) continue;
-      let m;
-      priceRe.lastIndex = 0;
-      while ((m = priceRe.exec(text))) {
-        const v = parsePrice(m[1]);
-        if (v && v >= opts.minPrice) prices.push({ v, struck: isStruck(el) });
-      }
-    }
-    delete card.dataset.card;
-
-    const struck = prices.filter(p => p.struck).map(p => p.v);
-    const live = prices.filter(p => !p.struck).map(p => p.v);
-    let normal = null, sale = null;
-    if (struck.length && live.length) {
-      normal = Math.max(...struck);
-      sale = Math.max(...live.filter(v => v < normal).concat([0])) || null;
-    } else {
-      const all = [...new Set(prices.map(p => p.v))].sort((a, b) => b - a);
-      const hasOff = /%\s*off|% de desc|descuento/i.test(card.innerText || '');
-      if (all.length >= 2 && hasOff) { normal = all[0]; sale = all[1]; }
-      else if (all.length >= 1) { normal = all[0]; }
-    }
+    const { normal, sale } = bidcomPrecios(card, opts.minPrice);
 
     // nombre: primer texto largo que no sea COD ni precio
     // (se descartan contadores de ofertas tipo "Finaliza en: 00:58:01")
@@ -120,6 +67,77 @@ function bidcomExtract(opts) {
     out.push({ sku, name, normal, sale, url: bidcomProductUrl(card, countCods), relampago });
   }
   return out;
+}
+
+// Precio normal (tachado) y rebajado (vigente) dentro de un contenedor: la tarjeta
+// de la lista o el bloque de precio de la página del producto. Se descartan los
+// montos de cuotas, "sin impuestos", "ahorrás", envío.
+function bidcomPrecios(box, minPrice = 100) {
+  const priceRe = /\$\s*([\d.]+(?:,\d{1,2})?)/g;
+  const skipRe = /cuota|impuesto|imp\.|ahorr|env[ií]o|desde|x mes|mensual/i;
+  const parsePrice = (s) => {
+    const n = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+    return isFinite(n) ? n : null;
+  };
+  const isStruck = (el) => {
+    for (let e = el; e && e.nodeType === 1; e = e.parentElement) {
+      if (['DEL', 'S', 'STRIKE'].includes(e.tagName)) return true;
+      const td = getComputedStyle(e).textDecorationLine || '';
+      if (td.includes('line-through')) return true;
+      const cls = (e.className && e.className.baseVal !== undefined) ? e.className.baseVal : (e.className || '');
+      if (/(old|list|before|regular|tachad|strike|previous|original)/i.test(cls)) return true;
+      if (e === box) break;
+    }
+    return false;
+  };
+  const prices = [];
+  for (const el of box.querySelectorAll('*')) {
+    const own = Array.from(el.childNodes)
+      .filter(c => c.nodeType === 3).map(c => c.textContent).join(' ');
+    const text = own.includes('$') ? own : (el.children.length === 0 ? el.textContent : '');
+    if (!text || !text.includes('$')) continue;
+    // contexto corto: "12 cuotas de $X", "Precio sin impuestos $Y". Solo si el
+    // contenedor tiene un único precio: si tiene varios, las palabras pueden ser de otro.
+    const par = el.parentElement;
+    const ptxt = (par && par !== box) ? (par.textContent || '').trim() : '';
+    const context = ptxt.length <= 80 && (ptxt.match(/\$/g) || []).length <= 1 ? ptxt : text;
+    if (skipRe.test(text) || skipRe.test(context)) continue;
+    let m;
+    priceRe.lastIndex = 0;
+    while ((m = priceRe.exec(text))) {
+      const v = parsePrice(m[1]);
+      if (v && v >= minPrice) prices.push({ v, struck: isStruck(el) });
+    }
+  }
+  const struck = prices.filter(p => p.struck).map(p => p.v);
+  const live = prices.filter(p => !p.struck).map(p => p.v);
+  let normal = null, sale = null;
+  if (struck.length && live.length) {
+    normal = Math.max(...struck);
+    sale = Math.max(...live.filter(v => v < normal).concat([0])) || null;
+  } else {
+    const all = [...new Set(prices.map(p => p.v))].sort((a, b) => b - a);
+    const hasOff = /%\s*off|% de desc|descuento/i.test(box.innerText || '');
+    if (all.length >= 2 && hasOff) { normal = all[0]; sale = all[1]; }
+    else if (all.length >= 1) { normal = all[0]; }
+  }
+  return { normal, sale, n: prices.length };
+}
+
+// Precio en la página (ficha) de un producto: el bloque de precio más cercano al
+// título (h1), sin subir hasta los productos relacionados de más abajo.
+function bidcomPrecioFicha() {
+  const h1 = document.querySelector('h1');
+  if (!h1) return null;
+  let mejor = null;
+  for (let box = h1.parentElement, i = 0; box && box !== document.body && i < 6; box = box.parentElement, i++) {
+    if ((box.innerText || '').match(new RegExp(BIDCOM_COD_REGEX, 'g'))?.length > 1) break;  // ya abarca otros productos
+    const r = bidcomPrecios(box);
+    if (r.normal != null) { mejor = { ...r, box }; if (r.sale != null) break; }
+  }
+  if (!mejor) return null;
+  const relampago = /s[oó]lo por hoy|finaliza en|termina en|oferta rel[aá]mpago|\b\d{1,2}:\d{2}:\d{2}\b/i.test(mejor.box.innerText || '');
+  return { normal: mejor.normal, sale: mejor.sale, relampago };
 }
 
 // Link a la página del producto (ej. https://www.bidcom.com.ar/estabilizadores/estabilizador-...).
