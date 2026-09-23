@@ -102,6 +102,11 @@ async function extraerCategoria(tabId, url) {
     await cargada;
     await chrome.scripting.executeScript({ target: { tabId }, files: ['extractor.js'] });
     const visibles = await enPestana(tabId, (ms) => bidcomLoadAll(ms), [ESPERA_MS]);
+    if (!visibles && pag === 0) {
+      // categoría principal sin productos: devolver sus subcategorías para recorrerlas
+      const subs = (await enPestana(tabId, () => bidcomSubcategorias())) || [];
+      if (subs.length) return { productos: [], subs };
+    }
     if (!visibles) estado(`   ⚠ No se encontraron productos (códigos "COD.") en ${actual}`, 'err');
     const lista = await enPestana(tabId, () => bidcomExtract()) || [];
     for (const p of lista) {
@@ -110,7 +115,7 @@ async function extraerCategoria(tabId, url) {
     estado(`   Página ${pag + 1}: ${Object.keys(encontrados).length} productos`);
     actual = await enPestana(tabId, () => bidcomNextPage());
   }
-  return Object.values(encontrados);
+  return { productos: Object.values(encontrados), subs: [] };
 }
 
 async function extraerTodo() {
@@ -129,15 +134,24 @@ async function extraerTodo() {
     return tab;
   };
   const todos = {};
+  // cola de categorías: una categoría principal sin productos agrega sus subcategorías
+  const cola = urls.map((url) => ({ url, nivel: 0 }));
+  const enCola = new Set(urls.map((u) => u.replace(/\/+$/, '').replace('://www.', '://')));
   try {
-    for (const url of urls) {
-      estado(`Abriendo ${url} …`);
+    while (cola.length) {
+      const { url, nivel } = cola.shift();
+      estado(`${nivel ? '   ↳ ' : ''}Abriendo ${url} …`);
       for (let intento = 1; intento <= 2; intento++) {
         try {
           const t = await pestanaViva();
-          for (const p of await extraerCategoria(t.id, url)) {
+          const r = await extraerCategoria(t.id, url);
+          for (const p of r.productos) {
             if (!todos[p.sku] || todos[p.sku].normal == null) todos[p.sku] = p;
           }
+          const nuevas = nivel < 2 ? r.subs.filter((u) => !enCola.has(u.replace('://www.', '://'))) : [];
+          if (r.subs.length) estado(`   Categoría principal: ${nuevas.length} subcategorías para recorrer.`);
+          nuevas.forEach((u) => enCola.add(u.replace('://www.', '://')));
+          cola.unshift(...nuevas.map((u) => ({ url: u, nivel: nivel + 1 })));
           break;
         } catch (e) {
           if (intento === 1) { estado(`   ↻ Reintentando ${url} (${e.message})`); continue; }
@@ -204,82 +218,6 @@ function mostrarFaltantes() {
   $('faltTabla').innerHTML = '<tr><th>SKU</th><th>Nombre</th><th>URL</th></tr>' +
     faltantes.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 70)}</td>` +
       `<td>${p.url ? `<a href="${esc(p.url)}" target="_blank">${esc(p.url)}</a>` : ''}</td></tr>`).join('');
-}
-
-// ---------- menú de categorías de Bidcom ----------
-async function leerMenu() {
-  $('btnMenu').disabled = true;
-  $('estado').textContent = '';
-  estado('Leyendo el menú de categorías de Bidcom…');
-  const miPestana = await chrome.tabs.getCurrent();
-  let tab;
-  try {
-    tab = await chrome.tabs.create({ url: 'about:blank', active: true });
-    const cargada = esperarCarga(tab.id);
-    cargada.catch(() => {});
-    // el menú del mismo sitio que las categorías cargadas (Bidcom por defecto)
-    const primera = $('categorias').value.split('\n').map((x) => x.trim()).find((x) => /^https?:\/\//i.test(x));
-    const inicio = primera ? new URL(primera).origin + '/' : 'https://www.bidcom.com.ar/';
-    await chrome.tabs.update(tab.id, { url: inicio });
-    await cargada;
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['extractor.js'] });
-    await new Promise((r) => setTimeout(r, ESPERA_MS));
-    await enPestana(tab.id, () => bidcomAbrirMenu());
-    await new Promise((r) => setTimeout(r, ESPERA_MS));
-    const cats = (await enPestana(tab.id, () => bidcomCategorias())) || [];
-    mostrarMenu(cats);
-    estado(cats.length ? `✔ Encontré ${cats.length} categorías.` : '⚠ No encontré categorías en el menú de Bidcom.', cats.length ? 'ok' : 'err');
-  } catch (e) {
-    estado(`✖ No se pudo leer el menú: ${e.message}`, 'err');
-  } finally {
-    if (tab) { try { await chrome.tabs.remove(tab.id); } catch (e) { /* ya cerrada */ } }
-    if (miPestana) await chrome.tabs.update(miPestana.id, { active: true });
-    $('btnMenu').disabled = false;
-  }
-}
-
-function mostrarMenu(cats) {
-  const elegidas = new Set($('categorias').value.split('\n').map((s) => s.trim().replace(/\/+$/, '')));
-  const grupos = new Map();
-  for (const c of cats) {
-    if (!grupos.has(c.grupo)) grupos.set(c.grupo, []);
-    grupos.get(c.grupo).push(c);
-  }
-  $('menuGrupos').innerHTML = Array.from(grupos, ([g, lista], i) =>
-    `<details><summary><input type="checkbox" class="grupo" data-g="${i}"> <b>${esc(g)}</b> <span class="cuenta">(${lista.length})</span></summary>` +
-    `<div class="subs">` + lista.map((c) =>
-      `<label><input type="checkbox" class="sub" data-g="${i}" value="${esc(c.url)}"${elegidas.has(c.url) || elegidas.has(c.url.replace('://www.', '://')) ? ' checked' : ''}> ${esc(c.nombre)}</label>`).join('') +
-    `</div></details>`).join('');
-  for (let i = 0; i < grupos.size; i++) sincronizarGrupo(i);
-  $('menuBox').hidden = !cats.length;
-}
-
-function sincronizarGrupo(i) {
-  const subs = Array.from(document.querySelectorAll(`#menuGrupos .sub[data-g="${i}"]`));
-  const g = document.querySelector(`#menuGrupos .grupo[data-g="${i}"]`);
-  const n = subs.filter((x) => x.checked).length;
-  g.checked = n > 0 && n === subs.length;
-  g.indeterminate = n > 0 && n < subs.length;
-}
-
-$('menuGrupos').addEventListener('click', (e) => {
-  if (e.target.classList.contains('grupo')) e.stopPropagation();  // tildar sin abrir/cerrar el grupo
-});
-$('menuGrupos').addEventListener('change', (e) => {
-  const t = e.target, i = t.dataset.g;
-  if (t.classList.contains('grupo')) {
-    document.querySelectorAll(`#menuGrupos .sub[data-g="${i}"]`).forEach((x) => { x.checked = t.checked; });
-  }
-  sincronizarGrupo(i);
-});
-
-function usarMenu() {
-  const urls = Array.from(document.querySelectorAll('#menuGrupos .sub:checked')).map((x) => x.value);
-  if (!urls.length) { alert('Tildá al menos una categoría.'); return; }
-  $('categorias').value = urls.join('\n');
-  guardar();
-  $('menuBox').hidden = true;
-  estado(`✔ Se cargaron ${urls.length} categorías. Ahora tocá "Extraer precios".`, 'ok');
 }
 
 // ---------- WooCommerce ----------
@@ -402,9 +340,6 @@ async function aplicarCambios() {
 
 // ---------- eventos ----------
 $('btnExtraer').addEventListener('click', extraerTodo);
-$('btnMenu').addEventListener('click', leerMenu);
-$('btnUsarMenu').addEventListener('click', usarMenu);
-$('btnCerrarMenu').addEventListener('click', () => { $('menuBox').hidden = true; });
 $('btnCsv').addEventListener('click', descargarCsv);
 $('btnVer').addEventListener('click', verCambios);
 $('btnAplicar').addEventListener('click', aplicarCambios);

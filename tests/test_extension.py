@@ -31,7 +31,14 @@ class TestExtension(unittest.TestCase):
         man["host_permissions"].append("http://127.0.0.1/*")
         (ext / "manifest.json").write_text(json.dumps(man))
 
-        quiet = type("Q", (SimpleHTTPRequestHandler,), {"log_message": lambda *a: None})
+        class Q(SimpleHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def translate_path(self, path):
+                real = super().translate_path(path)
+                return real + ".html" if not os.path.exists(real) and os.path.exists(real + ".html") else real
+        quiet = Q
         mock = HTTPServer(("127.0.0.1", 0), functools.partial(quiet, directory=str(HERE / "mock")))
         woo = HTTPServer(("127.0.0.1", 0), test_woo.H)
         for s in (mock, woo):
@@ -45,19 +52,19 @@ class TestExtension(unittest.TestCase):
             sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
             page = ctx.new_page()
             page.goto(f"chrome-extension://{sw.url.split('/')[2]}/app.html")
-            # menú de categorías: las principales no tienen link, se eligen con una casilla
+            # categoría principal sin productos: recorre sola sus subcategorías
             base = f"http://127.0.0.1:{mock.server_port}"
+            page.fill("#categorias", base + "/bebes-y-ninos")
+            page.click("#btnExtraer")
+            page.wait_for_selector("text=Listo", timeout=90_000)
+            est = page.inner_text("#estado")
+            self.assertIn("2 subcategorías", est)
+            self.assertIn("Listo: 2 productos", est)
+            tabla = page.inner_text("#tabla")
+            self.assertIn("SEG001", tabla)
+            self.assertIn("JUG001", tabla)
+            self.assertNotIn("ofertas", est)
             page.fill("#categorias", base + "/p1.html")
-            page.click("#btnMenu")
-            page.wait_for_selector("#menuBox:not([hidden])", timeout=30_000)
-            grupos = page.inner_text("#menuGrupos")
-            self.assertIn("Bebés y Niños", grupos)
-            self.assertIn("Tecnología", grupos)
-            self.assertNotIn("Contacto", grupos)
-            page.click("#menuGrupos details:has-text('Bebés y Niños') input.grupo")
-            page.click("#btnUsarMenu")
-            self.assertEqual(page.input_value("#categorias").splitlines(),
-                             [base + "/seguridad-bebes", base + "/juegos-y-juguetes", base + "/rodados"])
             page.fill("#categorias", base + "/p1.html")
             # la primera vez que se abre la pestaña de trabajo, la cerramos en el medio
             cerrada = []
