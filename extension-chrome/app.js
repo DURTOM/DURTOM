@@ -324,6 +324,17 @@ function pedirPermiso() {
   return chrome.permissions.request({ origins: [new URL(cfg.url).origin + '/*'] }).then((ok) => (ok ? cfg : null));
 }
 
+// Un cambio es "para revisar" si viene de la ficha de una oferta relámpago o si algún
+// precio cambia más de un 25%: esos vienen destildados y no se aplican solos.
+const LIMITE_CAMBIO = 0.25;
+function paraRevisar(p, cur, reg, sale) {
+  const salto = (a, b) => a && b && Math.abs(Number(b) - Number(a)) / Number(a) > LIMITE_CAMBIO;
+  const motivos = [];
+  if (p.deFicha) motivos.push('oferta relámpago: precio tomado de la página del producto');
+  if (salto(cur.regular_price, reg) || salto(cur.sale_price, sale)) motivos.push('cambia más de 25%');
+  return motivos;
+}
+
 async function verCambios() {
   guardar();
   if (!validos().length) { alert('Primero extraé los precios (paso 1).'); return; }
@@ -333,7 +344,7 @@ async function verCambios() {
   try {
     const mapa = await wooMapaSku(cfg);
     const borrar = $('wooBorrar').checked;
-    const simples = [], variaciones = {}, filas = [], nuevos = [];
+    const filas = [], nuevos = [];
     let coinciden = 0;
     // la lista de faltantes incluye las ofertas relámpago (solo importa el SKU)
     const lista = productos.filter((p) => !excluido(p) && deMarca(p));
@@ -345,18 +356,25 @@ async function verCambios() {
       const reg = fmt(p.normal);
       const sale = p.sale ? fmt(p.sale) : (borrar ? '' : (cur.sale_price || ''));
       if ((cur.regular_price || '') === reg && (cur.sale_price || '') === sale) continue;
-      const upd = { id: cur.id, regular_price: reg, sale_price: sale };
-      if (cur.parent) (variaciones[cur.parent] ||= []).push(upd); else simples.push(upd);
-      filas.push([p.sku, cur.regular_price, reg, cur.sale_price, sale]);
+      filas.push({
+        sku: p.sku, url: p.url, parent: cur.parent, motivos: paraRevisar(p, cur, reg, sale),
+        antes: [cur.regular_price, cur.sale_price], upd: { id: cur.id, regular_price: reg, sale_price: sale },
+      });
     }
-    cambiosWoo = { cfg, simples, variaciones, filas };
+    cambiosWoo = { cfg, filas };
     faltantes = nuevos;
     mostrarFaltantes();
-    $('wooResumen').textContent = `${coinciden} SKUs de Bidcom están en tu tienda · ${filas.length} con precio distinto · ` +
-      `${nuevos.length} no están en tu tienda (ver lista abajo).`;
-    $('wooTabla').innerHTML = '<tr><th>SKU</th><th class="num">Normal actual</th><th class="num">Normal nuevo</th><th class="num">Rebajado actual</th><th class="num">Rebajado nuevo</th></tr>' +
-      filas.map((f) => `<tr><td>${esc(f[0])}</td><td class="num">${pesos(f[1])}</td><td class="num"><b>${pesos(f[2])}</b></td>` +
-        `<td class="num">${pesos(f[3])}</td><td class="num"><b>${pesos(f[4])}</b></td></tr>`).join('');
+    const revisar = filas.filter((f) => f.motivos.length).length;
+    $('wooResumen').innerHTML = `${coinciden} SKUs de Bidcom están en tu tienda · ${filas.length} con precio distinto · ` +
+      `${nuevos.length} no están en tu tienda (ver lista abajo).` +
+      (revisar ? `<div class="aviso">⚠ ${revisar} cambios para revisar (en amarillo) vienen <b>destildados</b>: abrí el link, comparalo con Bidcom y tildalo si está bien.</div>` : '');
+    $('wooTabla').innerHTML = '<tr><th>Aplicar</th><th>SKU</th><th class="num">Normal actual</th><th class="num">Normal nuevo</th><th class="num">Rebajado actual</th><th class="num">Rebajado nuevo</th></tr>' +
+      filas.map((f, i) => `<tr class="${f.motivos.length ? 'revisar' : ''}">` +
+        `<td><input type="checkbox" class="aplicar" data-i="${i}"${f.motivos.length ? '' : ' checked'}></td>` +
+        `<td>${f.url ? `<a href="${esc(f.url)}" target="_blank">${esc(f.sku)}</a>` : esc(f.sku)}` +
+        (f.motivos.length ? `<div class="motivo">${esc(f.motivos.join(' · '))}</div>` : '') + '</td>' +
+        `<td class="num">${pesos(f.antes[0])}</td><td class="num"><b>${pesos(f.upd.regular_price)}</b></td>` +
+        `<td class="num">${pesos(f.antes[1])}</td><td class="num"><b>${pesos(f.upd.sale_price)}</b></td></tr>`).join('');
     $('wooTablaBox').hidden = !filas.length;
     $('btnAplicar').disabled = !filas.length;
   } catch (e) {
@@ -368,9 +386,15 @@ async function verCambios() {
 
 async function aplicarCambios() {
   if (!cambiosWoo) return;
-  const { cfg, simples, variaciones, filas } = cambiosWoo;
-  if (!confirm(`Se van a actualizar ${filas.length} productos en tu tienda. ¿Continuar?`)) return;
+  const { cfg } = cambiosWoo;
+  const elegidas = Array.from(document.querySelectorAll('#wooTabla .aplicar:checked')).map((c) => cambiosWoo.filas[c.dataset.i]);
+  if (!elegidas.length) { alert('No hay ningún cambio tildado para aplicar.'); return; }
+  const sinTildar = cambiosWoo.filas.length - elegidas.length;
+  if (!confirm(`Se van a actualizar ${elegidas.length} productos en tu tienda` +
+    (sinTildar ? ` (${sinTildar} destildados quedan como están)` : '') + '. ¿Continuar?')) return;
   $('btnAplicar').disabled = true; $('btnVer').disabled = true;
+  const simples = [], variaciones = {};
+  for (const f of elegidas) (f.parent ? (variaciones[f.parent] ||= []) : simples).push(f.upd);
   const lotes = [];
   for (let i = 0; i < simples.length; i += 100) lotes.push(['/products/batch', simples.slice(i, i + 100)]);
   for (const [pid, ups] of Object.entries(variaciones)) {
@@ -381,10 +405,11 @@ async function aplicarCambios() {
     for (const [path, update] of lotes) {
       const { data } = await wooFetch(cfg, path, { method: 'POST', body: JSON.stringify({ update }) });
       for (const it of data.update || []) (it.error ? errores++ : hechos++);
-      $('wooResumen').textContent = `Actualizando… ${hechos} de ${filas.length}`;
+      $('wooResumen').textContent = `Actualizando… ${hechos} de ${elegidas.length}`;
     }
     $('wooResumen').innerHTML = `<span class="ok">✔ Tienda actualizada: ${hechos} productos.</span>` +
-      (errores ? ` <span class="err">${errores} con error.</span>` : '');
+      (errores ? ` <span class="err">${errores} con error.</span>` : '') +
+      (sinTildar ? ` ${sinTildar} destildados quedaron como estaban.` : '');
     cambiosWoo = null;
   } catch (e) {
     $('wooResumen').innerHTML = `<span class="err">✖ Error al actualizar (${hechos} ya aplicados): ${esc(e.message)}</span>`;

@@ -108,6 +108,12 @@ class TestExtension(unittest.TestCase):
             page.fill("#wooCs", "cs")
             page.click("#btnVer")
             page.wait_for_selector("#btnAplicar:not([disabled])", timeout=20_000)
+            # cambios sospechosos (más de 25%) vienen destildados y marcados
+            fila = page.locator("#wooTabla tr.revisar")
+            self.assertEqual(fila.count(), 1)
+            self.assertIn("DRDJI100", fila.inner_text())
+            self.assertFalse(fila.locator("input.aplicar").is_checked())
+            fila.locator("input.aplicar").check()  # revisado a mano
             page.on("dialog", lambda d: d.accept())
             page.click("#btnAplicar")
             page.wait_for_selector("text=Tienda actualizada", timeout=20_000)
