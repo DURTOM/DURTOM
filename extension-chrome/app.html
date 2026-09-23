@@ -32,6 +32,14 @@
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .resumen { font-weight: 600; margin-top: 4px; }
   details summary { cursor: pointer; font-weight: 600; font-size: 17px; }
+  #menuGrupos { max-height: 420px; overflow: auto; border: 1px solid var(--borde); border-radius: 6px; padding: 6px 10px; }
+  #menuGrupos details { border-bottom: 1px solid var(--borde); padding: 6px 0; }
+  #menuGrupos details:last-child { border-bottom: 0; }
+  #menuGrupos summary { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  #menuGrupos .subs { columns: 2; padding: 6px 0 2px 28px; }
+  #menuGrupos .subs label { font-weight: 400; margin: 2px 0; display: flex; gap: 6px; align-items: center; break-inside: avoid; }
+  #menuGrupos .cuenta { color: #5b6477; font-weight: 400; font-size: 13px; }
+  @media (max-width: 640px) { #menuGrupos .subs { columns: 1; } }
   .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
   @media (max-width: 640px) { .fila { grid-template-columns: 1fr; } }
 </style>
@@ -43,6 +51,13 @@
     <h2><span class="n">1</span>Categorías de Bidcom</h2>
     <p class="ayuda">Pegá la dirección de cada categoría, una por renglón (copiala de la barra del navegador, por ejemplo <b>https://www.bidcom.com.ar/drones</b>).</p>
     <textarea id="categorias" spellcheck="false"></textarea>
+    <button id="btnMenu" class="secundario">📋 Elegir desde el menú de Bidcom</button>
+    <div id="menuBox" hidden>
+      <p class="ayuda" style="margin-top:12px">Tildá una categoría principal para elegir todas sus subcategorías (o abrí el grupo y elegí de a una). Después tocá <b>"Usar las elegidas"</b>.</p>
+      <div id="menuGrupos"></div>
+      <button id="btnUsarMenu" class="primario">✔ Usar las elegidas</button>
+      <button id="btnCerrarMenu" class="secundario">Cancelar</button>
+    </div>
     <label for="excluir">No traer productos cuyo SKU empiece con (separados por coma):</label>
     <input type="text" id="excluir" placeholder="REF, USA">
     <label for="marcas">Solo estas marcas (separadas por coma; vacío = todas):</label>

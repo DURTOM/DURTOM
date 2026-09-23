@@ -45,7 +45,20 @@ class TestExtension(unittest.TestCase):
             sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
             page = ctx.new_page()
             page.goto(f"chrome-extension://{sw.url.split('/')[2]}/app.html")
-            page.fill("#categorias", f"http://127.0.0.1:{mock.server_port}/p1.html")
+            # menú de categorías: las principales no tienen link, se eligen con una casilla
+            base = f"http://127.0.0.1:{mock.server_port}"
+            page.fill("#categorias", base + "/p1.html")
+            page.click("#btnMenu")
+            page.wait_for_selector("#menuBox:not([hidden])", timeout=30_000)
+            grupos = page.inner_text("#menuGrupos")
+            self.assertIn("Bebés y Niños", grupos)
+            self.assertIn("Tecnología", grupos)
+            self.assertNotIn("Contacto", grupos)
+            page.click("#menuGrupos details:has-text('Bebés y Niños') input.grupo")
+            page.click("#btnUsarMenu")
+            self.assertEqual(page.input_value("#categorias").splitlines(),
+                             [base + "/seguridad-bebes", base + "/juegos-y-juguetes", base + "/rodados"])
+            page.fill("#categorias", base + "/p1.html")
             # la primera vez que se abre la pestaña de trabajo, la cerramos en el medio
             cerrada = []
             def cerrar(pg):

@@ -191,3 +191,51 @@ async function bidcomLoadAll(waitMs) {
   }
   return count();
 }
+
+// ---------- Menú de categorías ----------
+// Abre el menú "Categorías" si está cerrado (algunos sitios lo arman al pasar el mouse).
+function bidcomAbrirMenu() {
+  const el = Array.from(document.querySelectorAll('a, button, span, div, li'))
+    .find((e) => /^categor[ií]as$/i.test((e.textContent || '').trim()) && e.children.length <= 2);
+  if (!el) return false;
+  for (const tipo of ['mouseenter', 'mouseover', 'pointerenter']) el.dispatchEvent(new MouseEvent(tipo, { bubbles: true }));
+  el.click();
+  return true;
+}
+
+// Junta los links a categorías (un solo tramo de dirección, ej. /drones) y los agrupa
+// bajo su título principal del menú, que puede no tener link (ej. "Bebés y Niños").
+function bidcomCategorias() {
+  const NO = /^(login|ingresar|registro|mi-cuenta|cuenta|carrito|checkout|contacto|ayuda|centro-de-ayuda|preguntas-frecuentes|sucursal|sucursales|seguimiento|segui-tu-compra|terminos|privacidad|blog|empresas|arrepentimiento|defensa-del-consumidor)$/i;
+  const corto = (t) => { t = (t || '').replace(/\s+/g, ' ').trim(); return t.length >= 2 && t.length <= 40 ? t : ''; };
+  const tituloDe = (a) => {
+    for (let box = a.parentElement, i = 0; box && box !== document.body && i < 8; box = box.parentElement, i++) {
+      for (let s = box.previousElementSibling; s; s = s.previousElementSibling) {
+        if (s.querySelector('a[href]') || s.matches('a[href]')) continue;  // es otro link, no un título
+        const t = corto(s.textContent);
+        if (t) return t;
+      }
+      // o un título como primer hijo del contenedor (ej. <div><p>Bebés</p><a>…</a><a>…</a></div>)
+      const primero = box.firstElementChild;
+      if (primero && !primero.contains(a) && !primero.querySelector('a[href]') && !primero.matches('a[href]')) {
+        const t = corto(primero.textContent);
+        if (t) return t;
+      }
+    }
+    return 'Otras';
+  };
+  const vistos = new Set(), salida = [];
+  for (const a of document.querySelectorAll('a[href]')) {
+    let u;
+    try { u = new URL(a.href, location.href); } catch (e) { continue; }
+    if (u.host !== location.host) continue;
+    const tramos = u.pathname.split('/').filter(Boolean);
+    if (tramos.length !== 1 || NO.test(tramos[0]) || !/^[a-z0-9-]+$/i.test(tramos[0])) continue;
+    const url = u.origin + '/' + tramos[0];
+    const nombre = corto(a.textContent) || tramos[0].replace(/-/g, ' ');
+    if (vistos.has(url)) continue;
+    vistos.add(url);
+    salida.push({ grupo: tituloDe(a), nombre, url });
+  }
+  return salida;
+}
