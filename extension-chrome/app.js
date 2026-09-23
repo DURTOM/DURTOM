@@ -222,12 +222,19 @@ function mostrarResultados() {
   faltantes = []; mostrarFaltantes();
   $('secResultados').hidden = !productos.length;
   const conRebaja = ok.filter((p) => p.sale).length;
-  $('resumen').textContent = `${ok.length} productos (${conRebaja} con precio rebajado)` +
-    (porSku ? ` · ${porSku} descartados por SKU (${prefijos().join(', ')})` : '') +
-    (porMarca ? ` · ${porMarca} de otras marcas` : '') +
-    (ok.some((p) => p.deFicha) ? ` · ${ok.filter((p) => p.deFicha).length} en oferta relámpago con precio normal de la ficha (⚡)` : '') +
-    (porRelampago.length ? ` · ${porRelampago.length} en oferta "Sólo por hoy" sin precio normal (no se actualizan: ${porRelampago.map((p) => p.sku).join(', ')})` : '') +
-    ` — ${fechaExtraccion || ''}`;
+  // Resumen: cuántos se van a actualizar y por qué quedaron afuera los demás.
+  const codigos = (lista) => `<details class="codigos"><summary>ver cuáles</summary>${lista.map((p) => esc(p.sku)).join(', ')}</details>`;
+  const deFicha = ok.filter((p) => p.deFicha);
+  const lineas = [
+    `<li class="ok">✔ <b>${ok.length} productos para actualizar</b> (${conRebaja} con precio rebajado)</li>`,
+    deFicha.length ? `<li>⚡ ${deFicha.length} estaban en oferta relámpago: se usa su precio normal de la página del producto ${codigos(deFicha)}</li>` : '',
+    '<li class="gris">No se incluyen:</li>',
+    porSku ? `<li class="gris">– ${porSku} con SKU que empieza con ${esc(prefijos().join(', '))}</li>` : '',
+    porMarca ? `<li class="gris">– ${porMarca} de otras marcas</li>` : '',
+    porRelampago.length ? `<li class="gris">– ${porRelampago.length} en oferta relámpago cuyo precio normal no se pudo leer (en tu tienda quedan como están) ${codigos(porRelampago)}</li>` : '',
+  ];
+  if (!porSku && !porMarca && !porRelampago.length) lineas.splice(2, 1);  // sin "No se incluyen:" vacío
+  $('resumen').innerHTML = `<ul class="lista-resumen">${lineas.join('')}</ul><div class="gris">Extraído el ${esc(fechaExtraccion || '')}</div>`;
   $('tabla').innerHTML = '<tr><th>SKU</th><th>Producto</th><th>Precio normal</th><th>Precio rebajado</th></tr>' +
     ok.map((p) => `<tr><td>${esc(p.sku)}</td><td>${p.deFicha ? '⚡ ' : ''}${esc(p.name).slice(0, 60)}</td>` +
       `<td class="num">${pesos(p.normal)}</td><td class="num">${pesos(p.sale)}</td></tr>`).join('');

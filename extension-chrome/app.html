@@ -31,6 +31,13 @@
   th { position: sticky; top: 0; background: #eef1f7; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .resumen { font-weight: 600; margin-top: 4px; }
+  #resumen { font-weight: 400; }
+  .lista-resumen { list-style: none; padding: 0; margin: 4px 0; }
+  .lista-resumen li { margin: 3px 0; }
+  .gris { color: #5b6477; font-size: 14px; }
+  .codigos { display: inline; font-size: 13px; }
+  .codigos summary { display: inline; cursor: pointer; color: var(--azul); font-size: 13px; font-weight: 400; }
+  .codigos[open] { display: block; margin: 4px 0 4px 18px; color: #5b6477; }
   details summary { cursor: pointer; font-weight: 600; font-size: 17px; }
   .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
   @media (max-width: 640px) { .fila { grid-template-columns: 1fr; } }
