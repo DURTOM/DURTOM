@@ -189,7 +189,10 @@ async function extraerTodo() {
         for (const [n, p] of rel.entries()) {
           try {
             const r = await precioDeFicha((await pestanaViva()).id, p.url);
-            if (r && r.normal != null && !r.relampago) {
+            // sano: rebajado menor que normal, y no más barato que la propia oferta relámpago
+            const sano = r && r.normal != null && !r.relampago && (r.sale == null || r.sale < r.normal) &&
+              (p.sale == null || (r.sale ?? r.normal) >= p.sale);
+            if (sano) {
               Object.assign(p, { normal: r.normal, sale: r.sale, relampago: false, deFicha: true });
               ok++;
             }
@@ -235,7 +238,7 @@ function mostrarResultados() {
   ];
   if (!porSku && !porMarca && !porRelampago.length) lineas.splice(2, 1);  // sin "No se incluyen:" vacío
   $('resumen').innerHTML = `<ul class="lista-resumen">${lineas.join('')}</ul><div class="gris">Extraído el ${esc(fechaExtraccion || '')}</div>`;
-  $('tabla').innerHTML = '<tr><th>SKU</th><th>Producto</th><th>Precio normal</th><th>Precio rebajado</th></tr>' +
+  $('tabla').innerHTML = '<tr><th>SKU</th><th>Producto</th><th class="num">Precio normal</th><th class="num">Precio rebajado</th></tr>' +
     ok.map((p) => `<tr><td>${esc(p.sku)}</td><td>${p.deFicha ? '⚡ ' : ''}${esc(p.name).slice(0, 60)}</td>` +
       `<td class="num">${pesos(p.normal)}</td><td class="num">${pesos(p.sale)}</td></tr>`).join('');
 }
@@ -351,7 +354,7 @@ async function verCambios() {
     mostrarFaltantes();
     $('wooResumen').textContent = `${coinciden} SKUs de Bidcom están en tu tienda · ${filas.length} con precio distinto · ` +
       `${nuevos.length} no están en tu tienda (ver lista abajo).`;
-    $('wooTabla').innerHTML = '<tr><th>SKU</th><th>Normal actual</th><th>Normal nuevo</th><th>Rebajado actual</th><th>Rebajado nuevo</th></tr>' +
+    $('wooTabla').innerHTML = '<tr><th>SKU</th><th class="num">Normal actual</th><th class="num">Normal nuevo</th><th class="num">Rebajado actual</th><th class="num">Rebajado nuevo</th></tr>' +
       filas.map((f) => `<tr><td>${esc(f[0])}</td><td class="num">${pesos(f[1])}</td><td class="num"><b>${pesos(f[2])}</b></td>` +
         `<td class="num">${pesos(f[3])}</td><td class="num"><b>${pesos(f[4])}</b></td></tr>`).join('');
     $('wooTablaBox').hidden = !filas.length;

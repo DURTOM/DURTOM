@@ -84,7 +84,8 @@ class TestExtension(unittest.TestCase):
             self.assertIn("Listo: 5 productos", page.inner_text("#estado"))
             self.assertIn("⚡ Dron DJI Mini 5 Pro Combo", page.inner_text("#tabla"))
             self.assertIn("1 estaban en oferta relámpago", page.inner_text("#resumen"))
-            page.screenshot(path=os.environ.get("CAPTURA", "/dev/null"), full_page=True)
+            if os.environ.get("CAPTURA"):
+                page.screenshot(path=os.environ["CAPTURA"], full_page=True)
             self.assertNotIn("REF-", page.inner_text("#tabla"))
             self.assertIn("1 con SKU que empieza con REF, USA", page.inner_text("#resumen"))
             page.fill("#excluir", "")  # sin filtro aparece al instante

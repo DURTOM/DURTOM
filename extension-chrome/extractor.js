@@ -106,7 +106,7 @@ function bidcomPrecios(box, minPrice = 100) {
     priceRe.lastIndex = 0;
     while ((m = priceRe.exec(text))) {
       const v = parsePrice(m[1]);
-      if (v && v >= minPrice) prices.push({ v, struck: isStruck(el) });
+      if (v && v >= minPrice) prices.push({ v, struck: isStruck(el), size: parseFloat(getComputedStyle(el).fontSize) || 0 });
     }
   }
   const struck = prices.filter(p => p.struck).map(p => p.v);
@@ -121,23 +121,36 @@ function bidcomPrecios(box, minPrice = 100) {
     if (all.length >= 2 && hasOff) { normal = all[0]; sale = all[1]; }
     else if (all.length >= 1) { normal = all[0]; }
   }
-  return { normal, sale, n: prices.length };
+  return { normal, sale, n: prices.length, prices };
 }
 
-// Precio en la página (ficha) de un producto: el bloque de precio más cercano al
-// título (h1), sin subir hasta los productos relacionados de más abajo.
+// Precio en la página (ficha) de un producto. El precio de venta es el más grande
+// de la zona del título (el número enorme); el normal, el tachado. Se buscan en la
+// zona del producto sin llegar a los productos relacionados de más abajo.
 function bidcomPrecioFicha() {
   const h1 = document.querySelector('h1');
   if (!h1) return null;
-  let mejor = null;
-  for (let box = h1.parentElement, i = 0; box && box !== document.body && i < 6; box = box.parentElement, i++) {
-    if ((box.innerText || '').match(new RegExp(BIDCOM_COD_REGEX, 'g'))?.length > 1) break;  // ya abarca otros productos
-    const r = bidcomPrecios(box);
-    if (r.normal != null) { mejor = { ...r, box }; if (r.sale != null) break; }
+  const variosCods = (el) => ((el.innerText || '').match(new RegExp(BIDCOM_COD_REGEX, 'g')) || []).length > 1;
+  let zona = h1.parentElement;
+  for (let i = 0; i < 6 && zona.parentElement && zona.parentElement !== document.body && !variosCods(zona.parentElement); i++) {
+    const r = bidcomPrecios(zona);
+    if (r.prices.some((p) => p.struck) && r.prices.some((p) => !p.struck)) break;
+    zona = zona.parentElement;
   }
-  if (!mejor) return null;
-  const relampago = /s[oó]lo por hoy|finaliza en|termina en|oferta rel[aá]mpago|\b\d{1,2}:\d{2}:\d{2}\b/i.test(mejor.box.innerText || '');
-  return { normal: mejor.normal, sale: mejor.sale, relampago };
+  const { prices } = bidcomPrecios(zona);
+  const vivos = prices.filter((p) => !p.struck);
+  if (!vivos.length) return null;
+  const mayor = Math.max(...vivos.map((p) => p.size));
+  const principal = vivos.filter((p) => p.size === mayor).map((p) => p.v);
+  let sale = Math.max(...principal);
+  const tachados = prices.filter((p) => p.struck && p.v > sale).map((p) => p.v);
+  let normal = tachados.length ? Math.min(...tachados) : null;  // el tachado más cercano al precio
+  if (normal == null) { normal = sale; sale = null; }            // sin descuento
+  // la oferta relámpago también puede mostrarse en la ficha
+  let area = zona;
+  while (area.parentElement && area.parentElement !== document.body && !variosCods(area.parentElement)) area = area.parentElement;
+  const relampago = /s[oó]lo por hoy|finaliza en|termina en|oferta rel[aá]mpago|\b\d{1,2}:\d{2}:\d{2}\b/i.test(area.innerText || '');
+  return { normal, sale, relampago };
 }
 
 // Link a la página del producto (ej. https://www.bidcom.com.ar/estabilizadores/estabilizador-...).

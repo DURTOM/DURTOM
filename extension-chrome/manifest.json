@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bidcom Precios",
-  "version": "2.2",
+  "version": "2.3",
   "description": "Extrae SKU, precio normal y precio rebajado de Bidcom y actualiza WooCommerce.",
   "permissions": [
     "tabs",
