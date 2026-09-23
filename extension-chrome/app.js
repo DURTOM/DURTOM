@@ -23,7 +23,9 @@ function deMarca(p) {
   const solo = listaMarcas('marcas');
   return !solo.length || mencionaAlguna(p, solo);
 }
-const validos = () => productos.filter((p) => !excluido(p) && deMarca(p));
+// Ofertas relámpago ("Sólo por hoy"): su precio vence en el día, por defecto no se actualizan.
+const saltearRelampago = (p) => p.relampago && $('sinRelampago').checked;
+const validos = () => productos.filter((p) => !excluido(p) && deMarca(p) && !saltearRelampago(p));
 let faltantes = [];      // productos de Bidcom cuyo SKU no existe en la tienda
 let cambiosWoo = null;   // {simples: [...], variaciones: {pid: [...]}, filas: [...]}
 
@@ -46,6 +48,7 @@ function guardar() {
     categorias: $('categorias').value,
     excluir: $('excluir').value,
     marcas: $('marcas').value,
+    sinRelampago: $('sinRelampago').checked,
     wooUrl: $('wooUrl').value.trim(), wooCk: $('wooCk').value.trim(), wooCs: $('wooCs').value.trim(),
     wooBorrar: $('wooBorrar').checked,
   });
@@ -56,6 +59,7 @@ async function cargar() {
   $('categorias').value = d.categorias ?? 'https://www.bidcom.com.ar/drones';
   $('excluir').value = d.excluir ?? 'REF, USA';
   $('marcas').value = d.marcas ?? '';
+  $('sinRelampago').checked = d.sinRelampago ?? true;
   $('wooUrl').value = d.wooUrl ?? '';
   $('wooCk').value = d.wooCk ?? '';
   $('wooCs').value = d.wooCs ?? '';
@@ -177,13 +181,16 @@ function mostrarResultados() {
   const ok = validos();
   const porSku = productos.filter(excluido).length;
   const porMarca = productos.filter((p) => !excluido(p) && !deMarca(p)).length;
+  const porRelampago = productos.filter((p) => !excluido(p) && deMarca(p) && saltearRelampago(p));
   cambiosWoo = null; $('btnAplicar').disabled = true; $('wooTablaBox').hidden = true; $('wooResumen').textContent = '';
   faltantes = []; mostrarFaltantes();
   $('secResultados').hidden = !productos.length;
   const conRebaja = ok.filter((p) => p.sale).length;
   $('resumen').textContent = `${ok.length} productos (${conRebaja} con precio rebajado)` +
     (porSku ? ` · ${porSku} descartados por SKU (${prefijos().join(', ')})` : '') +
-    (porMarca ? ` · ${porMarca} de otras marcas` : '') + ` — ${fechaExtraccion || ''}`;
+    (porMarca ? ` · ${porMarca} de otras marcas` : '') +
+    (porRelampago.length ? ` · ${porRelampago.length} en oferta "Sólo por hoy" (no se actualizan: ${porRelampago.map((p) => p.sku).join(', ')})` : '') +
+    ` — ${fechaExtraccion || ''}`;
   $('tabla').innerHTML = '<tr><th>SKU</th><th>Producto</th><th>Precio normal</th><th>Precio rebajado</th></tr>' +
     ok.map((p) => `<tr><td>${esc(p.sku)}</td><td>${esc(p.name).slice(0, 60)}</td>` +
       `<td class="num">${pesos(p.normal)}</td><td class="num">${pesos(p.sale)}</td></tr>`).join('');
@@ -281,11 +288,12 @@ async function verCambios() {
     const borrar = $('wooBorrar').checked;
     const simples = [], variaciones = {}, filas = [], nuevos = [];
     let coinciden = 0;
-    const lista = validos();
+    // la lista de faltantes incluye las ofertas relámpago (solo importa el SKU)
+    const lista = productos.filter((p) => !excluido(p) && deMarca(p));
     for (const p of lista) {
       const cur = mapa[p.sku.toUpperCase()];
       if (!cur) { nuevos.push(p); continue; }
-      if (p.normal == null) continue;
+      if (p.normal == null || saltearRelampago(p)) continue;
       coinciden++;
       const reg = fmt(p.normal);
       const sale = p.sale ? fmt(p.sale) : (borrar ? '' : (cur.sale_price || ''));
@@ -344,6 +352,7 @@ $('btnCsv').addEventListener('click', descargarCsv);
 $('btnVer').addEventListener('click', verCambios);
 $('btnAplicar').addEventListener('click', aplicarCambios);
 $('btnFaltantes').addEventListener('click', descargarFaltantes);
+$('sinRelampago').addEventListener('change', () => { guardar(); mostrarResultados(); });
 for (const id of ['excluir', 'marcas']) $(id).addEventListener('input', () => { guardar(); mostrarResultados(); });
 for (const id of ['categorias', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
 cargar();

@@ -17,6 +17,8 @@ class TestScraper(unittest.TestCase):
         items = bidcom_sync.scrape_all([MOCK.as_uri()], cfg)
         names = {p["sku"]: p["name"] for p in items}
         self.assertEqual(names["DRDJI090"], "Dron DJI Mini 5 Pro Combo")  # no el contador de la oferta
+        relampago = {p["sku"] for p in items if p["relampago"]}
+        self.assertEqual(relampago, {"DRDJI090"})  # tiene "Finaliza en: 00:58:01"
         urls = {p["sku"]: p["url"] for p in items}
         self.assertTrue(urls["DRDJI090"].endswith("/drones/dron-dji-mini-5-pro-combo"))  # tarjeta dentro del <a>
         self.assertTrue(urls["DRDJI077"].endswith("/p/1"))                              # link dentro de la tarjeta

@@ -115,7 +115,9 @@ function bidcomExtract(opts) {
       name = (card.innerText || '').split('\n').map(s => s.trim()).find(s => !noEsNombre(s)) ||
              (img ? img.alt.trim() : '');
     }
-    out.push({ sku, name, normal, sale, url: bidcomProductUrl(card, countCods) });
+    // oferta relámpago de un día ("SÓLO POR HOY", "Finaliza en: 17:59:14"): precio temporal
+    const relampago = /s[oó]lo por hoy|finaliza en|termina en|oferta rel[aá]mpago|\b\d{1,2}:\d{2}:\d{2}\b/i.test(card.innerText || '');
+    out.push({ sku, name, normal, sale, url: bidcomProductUrl(card, countCods), relampago });
   }
   return out;
 }

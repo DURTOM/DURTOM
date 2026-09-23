@@ -304,6 +304,12 @@ def main():
     if descartados:
         log.info("Se descartan %d productos por SKU (%s).", len(descartados), ", ".join(prefijos))
         products = [p for p in products if p not in descartados]
+    if cfg.getboolean("bidcom", "saltear_ofertas_relampago", fallback=True):
+        relampago = [p for p in products if p.get("relampago")]
+        if relampago:
+            log.info("No se actualizan %d productos en oferta relámpago (Sólo por hoy): %s",
+                     len(relampago), ", ".join(p["sku"] for p in relampago))
+            products = [p for p in products if not p.get("relampago")]
     if not products:
         log.error("No se extrajo ningún producto. Probá con --ver para mirar qué pasa.")
         return 1

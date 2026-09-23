@@ -78,7 +78,8 @@ class TestExtension(unittest.TestCase):
             page.click("#btnExtraer")
             page.wait_for_selector("text=Listo", timeout=90_000)
             self.assertIn("Reintentando", page.inner_text("#estado"))
-            self.assertIn("Listo: 5 productos", page.inner_text("#estado"))
+            self.assertIn("Listo: 4 productos", page.inner_text("#estado"))  # DRDJI090 es oferta relámpago
+            self.assertIn('1 en oferta "Sólo por hoy"', page.inner_text("#resumen"))
             self.assertNotIn("REF-", page.inner_text("#tabla"))
             self.assertIn("1 descartados", page.inner_text("#resumen"))
             page.fill("#excluir", "")  # sin filtro aparece al instante
@@ -117,7 +118,7 @@ class TestExtension(unittest.TestCase):
         # REF-DRDJI073 (página 2) queda afuera por el filtro "REF, USA" por defecto
         self.assertEqual(csv_text.splitlines(), [
             "SKU,Precio normal,Precio rebajado",
-            "DRDJI077,6199998,3099999", "DRDJI090,6399998,3199999", "GAD001,545907,",
+            "DRDJI077,6199998,3099999", "GAD001,545907,",
             "DRDJI100,3999998,1799999", "DRDJI200,5999998,2999999"])
         self.assertEqual(falt[0], "SKU;Nombre;URL")
         self.assertEqual([l.split(";")[0] for l in falt[1:]], ["DRDJI090"])
