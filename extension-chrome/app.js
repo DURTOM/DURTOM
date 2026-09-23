@@ -43,13 +43,35 @@ const fmt = (v) => (v == null || v === '' ? '' : (Number.isInteger(v) ? String(v
 const pesos = (v) => (v == null || v === '' ? '—' : '$' + Number(v).toLocaleString('es-AR'));
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// Tiendas WooCommerce: cada una con su dirección y claves. DURTOM es la de siempre.
+const TIENDAS = {
+  durtom: { nombre: 'DURTOM', url: 'https://www.durtom.com/' },
+  drones: { nombre: 'Tienda de Drones', url: 'https://tiendadedrones.com.ar/' },
+};
+let tiendas = {};  // {durtom: {url, ck, cs}, drones: {...}}
+let tiendaMostrada = 'durtom';  // la tienda cuyos datos están en los casilleros
+
+function leerCamposTienda() {
+  tiendas[tiendaMostrada] = { url: $('wooUrl').value.trim(), ck: $('wooCk').value.trim(), cs: $('wooCs').value.trim() };
+}
+function mostrarTienda(id) {
+  tiendaMostrada = id;
+  const t = tiendas[id] || {};
+  $('tienda').value = id;
+  $('wooUrl').value = t.url || TIENDAS[id].url;
+  $('wooCk').value = t.ck || '';
+  $('wooCs').value = t.cs || '';
+  $('nombreTienda').textContent = TIENDAS[id].nombre;
+}
+
 function guardar() {
+  leerCamposTienda();
   chrome.storage.local.set({
+    tiendas,
     categorias: $('categorias').value,
     excluir: $('excluir').value,
     marcas: $('marcas').value,
     sinRelampago: $('sinRelampago').checked,
-    wooUrl: $('wooUrl').value.trim(), wooCk: $('wooCk').value.trim(), wooCs: $('wooCs').value.trim(),
     wooBorrar: $('wooBorrar').checked,
   });
 }
@@ -60,11 +82,11 @@ async function cargar() {
   $('excluir').value = d.excluir ?? 'REF, USA';
   $('marcas').value = d.marcas ?? '';
   $('sinRelampago').checked = d.sinRelampago ?? true;
-  $('wooUrl').value = d.wooUrl ?? '';
-  $('wooCk').value = d.wooCk ?? '';
-  $('wooCs').value = d.wooCs ?? '';
+  // las claves cargadas antes de existir el selector son de DURTOM
+  tiendas = d.tiendas ?? { durtom: { url: d.wooUrl, ck: d.wooCk, cs: d.wooCs } };
+  mostrarTienda('durtom');
   $('wooBorrar').checked = d.wooBorrar ?? true;
-  if (d.wooUrl) $('detWoo').open = true;
+  if (tiendas.durtom && tiendas.durtom.ck) $('detWoo').open = true;
   if (d.ultimos && d.ultimos.length) { productos = d.ultimos; fechaExtraccion = d.ultimosFecha; mostrarResultados(); }
 }
 
@@ -425,6 +447,14 @@ $('btnVer').addEventListener('click', verCambios);
 $('btnAplicar').addEventListener('click', aplicarCambios);
 $('btnFaltantes').addEventListener('click', descargarFaltantes);
 $('sinRelampago').addEventListener('change', () => { guardar(); mostrarResultados(); });
+$('tienda').addEventListener('change', () => {
+  leerCamposTienda();  // lo escrito queda en la tienda que se estaba mostrando
+  mostrarTienda($('tienda').value);
+  guardar();
+  // lo calculado para la otra tienda ya no vale
+  cambiosWoo = null; faltantes = []; mostrarFaltantes();
+  $('btnAplicar').disabled = true; $('wooTablaBox').hidden = true; $('wooResumen').textContent = '';
+});
 for (const id of ['excluir', 'marcas']) $(id).addEventListener('input', () => { guardar(); mostrarResultados(); });
 for (const id of ['categorias', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
 $('version').textContent = 'versión ' + chrome.runtime.getManifest().version;

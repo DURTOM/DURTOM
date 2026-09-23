@@ -103,6 +103,17 @@ class TestExtension(unittest.TestCase):
             csv_text = Path(dl.value.path()).read_text(encoding="utf-8-sig")
 
             page.click("#detWoo summary")
+            # selector de tienda: arranca en DURTOM; la otra tienda guarda sus propios datos
+            self.assertEqual(page.input_value("#tienda"), "durtom")
+            self.assertIn("durtom.com", page.input_value("#wooUrl"))
+            page.select_option("#tienda", "drones")
+            self.assertIn("tiendadedrones.com.ar", page.input_value("#wooUrl"))
+            page.fill("#wooCk", "ck_drones")
+            page.select_option("#tienda", "durtom")
+            self.assertEqual(page.input_value("#wooCk"), "")
+            page.select_option("#tienda", "drones")
+            self.assertEqual(page.input_value("#wooCk"), "ck_drones")
+            self.assertIn("Tienda de Drones", page.inner_text("#btnAplicar"))
             page.fill("#wooUrl", f"http://127.0.0.1:{woo.server_port}")
             page.fill("#wooCk", "ck")
             page.fill("#wooCs", "cs")

@@ -14,7 +14,7 @@
   h2 { margin: 0 0 6px; font-size: 17px; }
   h2 .n { display: inline-block; width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 50%; background: var(--azul); color: #fff; margin-right: 8px; font-size: 14px; }
   p.ayuda { margin: 0 0 12px; color: #5b6477; font-size: 14px; }
-  textarea, input[type=text], input[type=password] { width: 100%; padding: 9px 10px; border: 1px solid var(--borde); border-radius: 6px; font: inherit; }
+  textarea, select, input[type=text], input[type=password] { width: 100%; padding: 9px 10px; border: 1px solid var(--borde); border-radius: 6px; font: inherit; }
   textarea { min-height: 110px; font-family: Consolas, monospace; font-size: 13px; }
   label { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 14px; }
   label.check { font-weight: 400; display: flex; gap: 8px; align-items: center; }
@@ -74,7 +74,13 @@
     <details id="detWoo">
       <summary><span class="n" style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--azul);color:#fff;margin-right:8px;font-size:14px">3</span>Opcional: actualizar la tienda directo (sin importar el CSV)</summary>
       <p class="ayuda" style="margin-top:10px">Se configura una sola vez. En WordPress: WooCommerce → Ajustes → Avanzado → API REST → <b>Añadir clave</b>, permisos <b>Lectura/Escritura</b>. Copiá acá las dos claves que te muestra.</p>
-      <label for="wooUrl">Dirección de tu tienda</label>
+      <label for="tienda">Tienda a actualizar</label>
+      <select id="tienda">
+        <option value="durtom">DURTOM (durtom.com)</option>
+        <option value="drones">Tienda de Drones (tiendadedrones.com.ar)</option>
+      </select>
+      <p class="ayuda" style="margin-top:6px">Cada tienda guarda su dirección y sus claves. Al abrir la extensión siempre empieza en DURTOM.</p>
+      <label for="wooUrl">Dirección de la tienda</label>
       <input type="text" id="wooUrl" placeholder="https://mitienda.com.ar">
       <div class="fila">
         <div><label for="wooCk">Clave del cliente (empieza con ck_)</label><input type="password" id="wooCk"></div>
@@ -82,7 +88,7 @@
       </div>
       <label class="check"><input type="checkbox" id="wooBorrar" checked> Si en Bidcom no hay descuento, quitar el precio rebajado en mi tienda</label>
       <button id="btnVer" class="secundario">🔍 Ver qué cambiaría</button>
-      <button id="btnAplicar" class="primario" disabled>✔ Aplicar cambios en la tienda</button>
+      <button id="btnAplicar" class="primario" disabled>✔ Aplicar cambios en <span id="nombreTienda">DURTOM</span></button>
       <div class="resumen" id="wooResumen"></div>
       <div class="tabla" id="wooTablaBox" hidden><table id="wooTabla"></table></div>
     </details>
