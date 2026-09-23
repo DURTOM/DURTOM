@@ -355,4 +355,5 @@ $('btnFaltantes').addEventListener('click', descargarFaltantes);
 $('sinRelampago').addEventListener('change', () => { guardar(); mostrarResultados(); });
 for (const id of ['excluir', 'marcas']) $(id).addEventListener('input', () => { guardar(); mostrarResultados(); });
 for (const id of ['categorias', 'wooUrl', 'wooCk', 'wooCs', 'wooBorrar']) $(id).addEventListener('change', guardar);
+$('version').textContent = 'versión ' + chrome.runtime.getManifest().version;
 cargar();

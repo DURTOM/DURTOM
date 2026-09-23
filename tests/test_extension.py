@@ -52,6 +52,7 @@ class TestExtension(unittest.TestCase):
             sw = ctx.service_workers[0] if ctx.service_workers else ctx.wait_for_event("serviceworker")
             page = ctx.new_page()
             page.goto(f"chrome-extension://{sw.url.split('/')[2]}/app.html")
+            self.assertIn("versión " + man["version"], page.inner_text("header"))
             # categoría principal sin productos: recorre sola sus subcategorías
             base = f"http://127.0.0.1:{mock.server_port}"
             page.fill("#categorias", base + "/bebes-y-ninos")
