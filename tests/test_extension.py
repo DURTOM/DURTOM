@@ -46,8 +46,19 @@ class TestExtension(unittest.TestCase):
             page = ctx.new_page()
             page.goto(f"chrome-extension://{sw.url.split('/')[2]}/app.html")
             page.fill("#categorias", f"http://127.0.0.1:{mock.server_port}/p1.html")
+            # la primera vez que se abre la pestaña de trabajo, la cerramos en el medio
+            cerrada = []
+            def cerrar(pg):
+                if not cerrada:
+                    cerrada.append(1)
+                    pg.wait_for_load_state()
+                    pg.wait_for_timeout(300)
+                    pg.close()
+            ctx.on("page", cerrar)
             page.click("#btnExtraer")
             page.wait_for_selector("text=Listo", timeout=90_000)
+            self.assertIn("Reintentando", page.inner_text("#estado"))
+            self.assertIn("Listo: 5 productos", page.inner_text("#estado"))
             self.assertNotIn("REF-", page.inner_text("#tabla"))
             self.assertIn("1 descartados", page.inner_text("#resumen"))
             page.fill("#excluir", "")  # sin filtro aparece al instante

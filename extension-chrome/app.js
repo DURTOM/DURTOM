@@ -65,12 +65,23 @@ async function cargar() {
 }
 
 // ---------- extracción ----------
+// Espera a que la pestaña termine de cargar una página web (no la pestaña en
+// blanco inicial). Falla si la pestaña se cierra, para poder reintentar.
 function esperarCarga(tabId) {
-  return new Promise((resolve) => {
-    const fin = setTimeout(listo, 60000);
-    function listo() { clearTimeout(fin); chrome.tabs.onUpdated.removeListener(escucha); resolve(); }
-    function escucha(id, info) { if (id === tabId && info.status === 'complete') listo(); }
+  return new Promise((resolve, reject) => {
+    const fin = setTimeout(() => listo(), 60000);
+    function listo(error) {
+      clearTimeout(fin);
+      chrome.tabs.onUpdated.removeListener(escucha);
+      chrome.tabs.onRemoved.removeListener(cerrada);
+      error ? reject(error) : resolve();
+    }
+    function escucha(id, info, tab) {
+      if (id === tabId && info.status === 'complete' && /^https?:/i.test(tab.url || '')) listo();
+    }
+    function cerrada(id) { if (id === tabId) listo(new Error('se cerró la pestaña')); }
     chrome.tabs.onUpdated.addListener(escucha);
+    chrome.tabs.onRemoved.addListener(cerrada);
   });
 }
 
@@ -86,6 +97,7 @@ async function extraerCategoria(tabId, url) {
   for (let pag = 0; pag < 100 && actual && !visitadas.has(actual); pag++) {
     visitadas.add(actual);
     const cargada = esperarCarga(tabId);
+    cargada.catch(() => {});  // si falla la navegación, el error sale abajo
     await chrome.tabs.update(tabId, { url: actual });
     await cargada;
     await chrome.scripting.executeScript({ target: { tabId }, files: ['extractor.js'] });
@@ -108,21 +120,33 @@ async function extraerTodo() {
   $('btnExtraer').disabled = true;
   $('estado').textContent = '';
   const miPestana = await chrome.tabs.getCurrent();
-  const tab = await chrome.tabs.create({ url: 'about:blank', active: true });
+  // Pestaña de trabajo: si se cierra en el medio (a mano, por Chrome o por la
+  // página), se abre otra y se reintenta la categoría una vez.
+  let tab = null;
+  const pestanaViva = async () => {
+    if (tab) { try { return await chrome.tabs.get(tab.id); } catch (e) { /* se cerró */ } }
+    tab = await chrome.tabs.create({ url: 'about:blank', active: true });
+    return tab;
+  };
   const todos = {};
   try {
     for (const url of urls) {
       estado(`Abriendo ${url} …`);
-      try {
-        for (const p of await extraerCategoria(tab.id, url)) {
-          if (!todos[p.sku] || todos[p.sku].normal == null) todos[p.sku] = p;
+      for (let intento = 1; intento <= 2; intento++) {
+        try {
+          const t = await pestanaViva();
+          for (const p of await extraerCategoria(t.id, url)) {
+            if (!todos[p.sku] || todos[p.sku].normal == null) todos[p.sku] = p;
+          }
+          break;
+        } catch (e) {
+          if (intento === 1) { estado(`   ↻ Reintentando ${url} (${e.message})`); continue; }
+          estado(`   ✖ Error en ${url}: ${e.message}`, 'err');
         }
-      } catch (e) {
-        estado(`   ✖ Error en ${url}: ${e.message}`, 'err');
       }
     }
   } finally {
-    try { await chrome.tabs.remove(tab.id); } catch (e) { /* ya cerrada */ }
+    if (tab) { try { await chrome.tabs.remove(tab.id); } catch (e) { /* ya cerrada */ } }
     if (miPestana) await chrome.tabs.update(miPestana.id, { active: true });
     $('btnExtraer').disabled = false;
   }
