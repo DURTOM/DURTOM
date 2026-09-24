@@ -9,6 +9,7 @@
  *    lista y en la ficha).
  *  - Productos de menos: en la ficha, "Envío gratis en compras desde $400.000".
  *  - Carrito y checkout: "Te faltan $X para tener ENVÍO GRATIS".
+ *  - Con envío gratis, se oculta la tarifa plana para que no se elija por error.
  *
  * Instalación: WPCode → Code Snippets → Add Snippet → "Add Your Custom Code"
  * → "PHP Snippet" → pegar este código (sin la primera línea "<?php") →
@@ -65,6 +66,26 @@ function dt_aviso_envio_gratis() {
 }
 add_action( 'woocommerce_before_cart', 'dt_aviso_envio_gratis' );
 add_action( 'woocommerce_before_checkout_form', 'dt_aviso_envio_gratis', 5 );
+
+// 4) Si corresponde envío gratis, no ofrecer la tarifa plana (que nadie la elija por error).
+//    Se mantienen otras opciones, como "Retiro en local".
+add_filter( 'woocommerce_package_rates', function ( $rates ) {
+	$hay_gratis = false;
+	foreach ( $rates as $rate ) {
+		if ( 'free_shipping' === $rate->get_method_id() ) {
+			$hay_gratis = true;
+			break;
+		}
+	}
+	if ( $hay_gratis ) {
+		foreach ( $rates as $id => $rate ) {
+			if ( 'flat_rate' === $rate->get_method_id() ) {
+				unset( $rates[ $id ] );
+			}
+		}
+	}
+	return $rates;
+}, 100 );
 
 // Estilos (color, tamaño y posición se cambian acá).
 add_action( 'wp_head', function () {
