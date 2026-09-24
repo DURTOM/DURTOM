@@ -6,7 +6,7 @@
  * Córdoba Capital), según lo configurado en WooCommerce → Ajustes → Envío.
  * Este código solo lo comunica:
  *  - Productos de $400.000 o más: cartel "ENVÍO GRATIS" junto al precio (en la
- *    lista y en la ficha) y sobre la imagen si la plantilla lo permite.
+ *    lista y en la ficha).
  *  - Productos de menos: en la ficha, "Envío gratis en compras desde $400.000".
  *  - Carrito y checkout: "Te faltan $X para tener ENVÍO GRATIS".
  *
@@ -37,21 +37,7 @@ add_filter( 'woocommerce_get_price_html', function ( $html, $product ) {
 	return $html . ' <span class="dt-envio-chip">ENVÍO GRATIS</span>';
 }, 20, 2 );
 
-// 2) Cartel sobre la imagen (solo en plantillas que usan los lugares estándar de WooCommerce).
-add_action( 'woocommerce_before_shop_loop_item_title', function () {
-	global $product;
-	if ( dt_tiene_envio_gratis( $product ) ) {
-		echo '<span class="dt-envio-gratis">ENVÍO GRATIS</span>';
-	}
-}, 9 );
-add_action( 'woocommerce_before_single_product_summary', function () {
-	global $product;
-	if ( dt_tiene_envio_gratis( $product ) ) {
-		echo '<span class="dt-envio-gratis dt-en-ficha">ENVÍO GRATIS</span>';
-	}
-}, 19 );
-
-// 3) En la ficha de productos más baratos: invitar a llegar al mínimo.
+// 2) En la ficha de productos más baratos: invitar a llegar al mínimo.
 add_action( 'woocommerce_single_product_summary', function () {
 	global $product;
 	if ( $product instanceof WC_Product && ! dt_tiene_envio_gratis( $product ) ) {
@@ -60,7 +46,7 @@ add_action( 'woocommerce_single_product_summary', function () {
 	}
 }, 11 );
 
-// 4) Carrito y checkout: cuánto falta para el envío gratis.
+// 3) Carrito y checkout: cuánto falta para el envío gratis.
 function dt_aviso_envio_gratis() {
 	if ( ! function_exists( 'WC' ) || ! WC()->cart || WC()->cart->is_empty() ) {
 		return;
@@ -89,15 +75,6 @@ add_action( 'wp_head', function () {
 			background: #0a7d3b; color: #fff; font-weight: 700; font-size: 11px;
 			line-height: 1; padding: 4px 7px; border-radius: 4px; letter-spacing: .4px; white-space: nowrap;
 		}
-		ul.products li.product { position: relative; }
-		.single-product div.product { position: relative; }
-		.dt-envio-gratis {
-			position: absolute; top: 10px; right: 10px; z-index: 9;
-			background: #0a7d3b; color: #fff; font-weight: 700; font-size: 12px;
-			line-height: 1; padding: 6px 9px; border-radius: 4px; letter-spacing: .5px;
-			pointer-events: none;
-		}
-		.dt-envio-gratis.dt-en-ficha { top: 15px; left: 15px; right: auto; font-size: 14px; }
 		.dt-envio-texto { color: #0a7d3b; margin: 6px 0 14px; font-size: 15px; }
 	</style>
 	<?php
